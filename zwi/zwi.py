@@ -21,7 +21,7 @@ def cli():
 @click.password_option(help='Zwift password')
 def auth(name, password):
     """Establish the authentication."""
-    print(name, password)
+
     try:
         cl = Client(name, password)
         pr = cl.get_profile()
@@ -57,7 +57,7 @@ def auth(name, password):
             pass
 
         sys.exit(0)
-    except keyring.errors as e:
+    except keyring.errors.KeyringError as e:
         print('***keyring error:', e)
         sys.exit(4)
         pass
@@ -95,7 +95,7 @@ def zwi_init():
         name = keyring.get_password('zwi.py', 'username')
         password = keyring.get_password('zwi.py', name)
         pass
-    except keyring.errors as e:
+    except keyring.errors.KeyringError as e:
         print('***keyring error:', e)
         sys.exit(5)
         pass
