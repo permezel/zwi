@@ -25,7 +25,7 @@ This is a small python programme to facilitate maintaining the followers lists.
     ./zwi.py auth
 
 This script will store the Zwift login credentials in the system keychain.
-One authentication has been established, the login credentialy need not be passes on each invocation.
+One authentication has been established, the login credentials need not be passed on each invocation.
 
 ## Verification
 
@@ -47,7 +47,10 @@ You will have to manually search for the user in the Zwift companion and decide 
     ./zwi.py wers --help
     ./zwi.py wers
 
-The `wers` function will check the followers list and display any followers I am not following.  Certain users do will follow you, but not respond to reciprocal follow requests, so they will remain in limbo.  You can always try unfollowing/refollowing to see if the recalcitrant is interested in reciprocity.  As above, as far as I know, one has to use the Zwift companion app to search by name.
+The `wers` function will check the followers list and display any lacking reciprocity.
+Certain users will follow you, but not respond to reciprocal follow requests, remaining forever in limbo.
+One can always try unfollowing/refollowing to see if the recalcitrant is interested in reciprocity.
+As above, as far as I know, one has to use the Zwift companion app to search by name.
 
 # Hints
 
