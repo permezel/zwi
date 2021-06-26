@@ -25,7 +25,7 @@ This is a small python programme to facilitate maintaining the followers lists.
     ./zwi.py auth
 
 This script will store the Zwift login credentials in the system keychain.
-One authentication has been established, the login credentials need not be passed on each invocation.
+Once authentication has been established, the login credentials need not be passed on each invocation.
 
 ## Verification
 
