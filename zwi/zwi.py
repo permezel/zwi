@@ -71,6 +71,36 @@ def check():
     pass
 
 @cli.command()
+def clear():
+    """Clear out any saved authentication information."""
+
+    name = None
+    
+    try:
+        name = keyring.get_password('zwi.py', 'username')
+        pass
+    except keyring.errors.KeyringError as e:
+        print('***keyring error:', e)
+        sys.exit(5)
+        pass
+
+    try:
+        keyring.delete_password('zwi.py', name)
+    except keyring.errors.KeyringError as e:
+        print('Trying to delete password: ***keyring error:', e)
+        pass
+        
+    try:
+        keyring.delete_password('zwi.py', 'username')
+    except keyring.errors.KeyringError as e:
+        print('Trying to delete username: ***keyring error:', e)
+        pass
+
+    sys.exit(0)
+    pass
+        
+    
+@cli.command()
 def wees():
     """Display followees who are not following me."""
     cl, pr = zwi_init()
