@@ -52,6 +52,10 @@ Certain users will follow you, but not respond to reciprocal follow requests, re
 One can always try unfollowing/refollowing to see if the recalcitrant is interested in reciprocity.
 As above, as far as I know, one has to use the Zwift companion app to search by name.
 
+## Removing authentication information
+
+The `clear` function will remove any cached user/password information from the keystore.
+
 # Hints
 
 When searching by name, I find it helps to type in the bits of the name which are more likely to be unique, so as to limit the lists presented.
