@@ -101,20 +101,22 @@ def clear():
         
     
 @cli.command()
-def wees():
+@click.option('-v', '--verbose', count=True)
+def wees(verbose):
     """Display followees who are not following me."""
     cl, pr = zwi_init()
 
-    followees(pr)
+    followees(pr, verbose)
     sys.exit(0)
     pass
 
 @cli.command()
-def wers():
+@click.option('-v', '--verbose', count=True)
+def wers(verbose):
     """Display followers who I am not following."""
     cl, pr = zwi_init()
 
-    followers(pr)
+    followers(pr, verbose)
     sys.exit(0)
     pass
     
@@ -143,7 +145,7 @@ def zwi_init():
     return (None, None)
 
 
-def followees(pr, start=0, lim=5000):
+def followees(pr, verbose, start=0, lim=5000):
     count = 0
     while start < lim:
         fe = pr.request.json('/api/profiles/{}/followees?start={}&limit=200'.format(pr.player_id, start))
@@ -151,10 +153,20 @@ def followees(pr, start=0, lim=5000):
             count += 1
             fep = f['followeeProfile']
             soc = fep['socialFacts']
-            if soc['followeeStatusOfLoggedInPlayer'] != soc['followerStatusOfLoggedInPlayer']:
-                print('{} {}\t{} {}'.format(soc['followeeStatusOfLoggedInPlayer']
-                                            , soc['followerStatusOfLoggedInPlayer']
-                                            , fep['firstName'], fep['lastName']))
+            boo = (soc['followeeStatusOfLoggedInPlayer'] != soc['followerStatusOfLoggedInPlayer'])
+
+            if verbose > 0:
+                # dump out entire list
+                print('{:4d}{}{} {}\t{} {}'.format(count, [' ', '*'][boo]
+                                                   , soc['followeeStatusOfLoggedInPlayer']
+                                                   , soc['followerStatusOfLoggedInPlayer']
+                                                   , fep['firstName'], fep['lastName']))
+            elif boo:
+                # disply only those whos soc status match
+                print('{:4d} {} {}\t{} {}'.format(count
+                                                  , soc['followeeStatusOfLoggedInPlayer']
+                                                  , soc['followerStatusOfLoggedInPlayer']
+                                                  , fep['firstName'], fep['lastName']))
                 pass
             pass
         start += 200
@@ -162,7 +174,7 @@ def followees(pr, start=0, lim=5000):
     print('processed {} followees'.format(count))
     pass
 
-def followers(pr, start=0, lim=5000):
+def followers(pr, verbose, start=0, lim=5000):
     count = 0
     while start < lim:
         fe = pr.request.json('/api/profiles/{}/followers?start={}&limit=200'.format(pr.player_id, start))
@@ -170,10 +182,20 @@ def followers(pr, start=0, lim=5000):
             count += 1
             fep = f['followerProfile']
             soc = fep['socialFacts']
-            if soc['followeeStatusOfLoggedInPlayer'] != soc['followerStatusOfLoggedInPlayer']:
-                print('{} {}\t{} {}'.format(soc['followeeStatusOfLoggedInPlayer']
-                                            , soc['followerStatusOfLoggedInPlayer']
-                                            , fep['firstName'], fep['lastName']))
+            boo = (soc['followeeStatusOfLoggedInPlayer'] != soc['followerStatusOfLoggedInPlayer'])
+
+            if verbose > 0:
+                # dump out entire list
+                print('{:4d}{}{} {}\t{} {}'.format(count, [' ', '*'][boo]
+                                                   , soc['followeeStatusOfLoggedInPlayer']
+                                                   , soc['followerStatusOfLoggedInPlayer']
+                                                   , fep['firstName'], fep['lastName']))
+            elif boo:
+                # disply only those whos soc status match
+                print('{:4d} {} {}\t{} {}'.format(count
+                                                  , soc['followeeStatusOfLoggedInPlayer']
+                                                  , soc['followerStatusOfLoggedInPlayer']
+                                                  , fep['firstName'], fep['lastName']))
                 pass
             pass
         start += 200
