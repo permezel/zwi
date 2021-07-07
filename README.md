@@ -24,7 +24,7 @@ This is a small python programme to facilitate maintaining the followers lists.
     ./zwi.py auth --help
     ./zwi.py auth
 
-This `auth` function will store the Zwift login credentials in the system keychain.
+The `auth` function will store the Zwift login credentials in the system keychain.
 Once authentication has been established, the login credentials need not be passed on each invocation.
 
 ## Verification
@@ -36,10 +36,12 @@ The `check` function will verify that the stored credentials function.
 
 ## Initialise/Reset database
 
+`zwi` maintains state in `${HOME}/.zwi/`.  An `sqlite3` database is used to cache the state of the user's `followers` and `followees` lists.
+
    ./zwi.py reset --help
    ./zwi.py reset
 
-`zwi` maintains state in `${HOME}/.zwi/`.  An `sqlite3` database is used to cache the state of the user's `followers` and `followees` lists.
+The `reset` function deletes the `${HOME}/.zwi/zwi.db` database file if it exists, creates the `sqlite3` database, and populates the database with the `followers` and `followees` tables.
 
 *** Currently, this version only supports a one-time slurp of the `followers` list.
 
@@ -48,17 +50,17 @@ The `check` function will verify that the stored credentials function.
    ./zwi.py gui --help
    ./zwi.py gui
 
+The `gui` function pops up a window representing a desire to write more code.
+
 Using the Zwift user login information provided (see below) the followers list is obtained and stored locally in a database.
 Currently, the list is not refreshed.  Working on it.
-A window pops up displaying a subset of the information.
-More to come here...
    
 ## Followees
 
    ./zwi.py wees --help
    ./zwi.py wees
 
-The `wees` function will check the followees list (them who's followed).
+The `wees` function will check the cached followees list (them who's followed).
 Any subject who is being followed but who is not reciprocating is displayed.
 You will have to manually search for the user in the Zwift companion and decide what punishment to hand out.
 
@@ -67,7 +69,7 @@ You will have to manually search for the user in the Zwift companion and decide 
    ./zwi.py wers --help
    ./zwi.py wers
 
-The `wers` function will check the followers list and display any lacking reciprocity.
+The `wers` function will check the cached followers list and display any lacking reciprocity.
 Certain users will follow you, but not respond to reciprocal follow requests, remaining forever in limbo.
 One can always try unfollowing/refollowing to see if the recalcitrant is interested in reciprocity.
 As above, as far as I know, one has to use the Zwift companion app to search by name.
