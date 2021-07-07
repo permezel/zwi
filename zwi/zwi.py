@@ -15,17 +15,45 @@ import os
 import sqlite3 as sq
 
 try:
-   from zwift import Client
-   import keyring
-   import click
+    from zwift import Client
+    import keyring
+    import click
 except Exception as e:
     print('import error', e)
     print('pip3 install zwift-client keyring click')
     sys.exit(1)
     pass
 
-ZWIDIR = os.getenv('HOME') + '/.zwi/'
-DBFILE = ZWIDIR + 'zwi.db'
+verbosity = 0
+debug_lvl = 0
+
+def verbo(lvl, fmt, *args):
+    if verbosity >= lvl: sys.stderr.write(fmt % args + '\n')
+    return
+
+def debug(lvl, fmt, *args):
+    if debug_lvl >= lvl: sys.stderr.write(fmt % args + '\n')
+    return
+
+class Error(Exception):
+    def __init__(self, fmt, *args):
+        self.data = fmt % args
+        pass
+
+    def __str__(self):
+        return self.data
+
+    def __repr__(self):
+        return 'Error(' + self.data + ')'
+    pass
+
+def error(fmt, *args):
+    debug(9, 'error: %r' % (fmt % args))
+    raise Error(fmt, *args)
+
+def warn(fmt, *args):
+    sys.stderr.write('warning: ' + fmt % args + '\n')
+    return
 
 @click.group()
 def cli():
@@ -266,7 +294,6 @@ class Table:
         """Add a column definition for the table.
         We also incorporate the @property."""
         name = fun.__name__
-        # print('col', name, fun)
         self._name.append(name)
         self._meth[name] = fun
         self._type[name] = 'text'
@@ -285,7 +312,6 @@ class Table:
         return ', '.join(f'{a}' for a in self._name)
 
     def table_template(self):
-        # print('table template', self)
         return ', '.join(f'{a} {b}' for (a, b) in zip(self._name, [self._type[n] for n in self._name]))
 
     def insert_template(self):
@@ -302,8 +328,101 @@ class Table:
     pass
 
 class DataBase(object):
-    """Not sure where the DB should arise."""
-    def __init__(self):
+    cache = {}		# DB universe
+
+    def __init__(self, path=None, reset=False):
+        self._path = None
+        super().__init__()
+        self._path = path = DataBase.db_path(path)
+        self._cur  = None
+
+        debug(1, f'init {self=} {self._path=} {DataBase.cache=}')
+
+        if path in DataBase.cache:
+            if reset:
+                del DataBase.cache[path]
+            else:
+                raise Error(f'Programming error: {path} already exists in cache.')
+            pass
+
+        self._db = DataBase.__db_connect(path, reset)
+
+        DataBase.cache[path] = self
+        pass
+
+    def __del__(self):
+        debug(1, f'del {self=} {self._path=} {DataBase.cache=}')
+        if self._path in DataBase.cache:
+            del DataBase.cache[self._path]
+            pass
+
+    def db_path(path=None):
+        """Return the path name."""
+        if path is None:
+            zdir = os.getenv('HOME') + '/.zwi/'
+            path = zdir + 'zwi.db'
+            pass
+        return path
+
+    def __db_connect(path, reset=False):
+        """Setup DB for access."""
+
+        if reset and os.path.isfile(path):
+            try:
+                os.remove(path)
+            except Exception as e:
+                # print(f'Error: {e}')
+                raise e
+            pass
+
+        if reset or path not in DataBase.cache:
+            try:	# first, try to create the DB
+                db = sq.connect(path)
+            except Exception as e:
+                raise e
+            DataBase.cache[path] = db
+            pass
+        return DataBase.cache[path]
+
+    @classmethod
+    def db_connect(cls, path=None, reset=False, drop=False):
+        """Connect to a database."""
+        path = cls.db_path(path)
+        if path not in cls.cache:
+            return DataBase(path, reset)
+        else:
+            return cls.cache[path]
+        pass
+    
+    @property
+    def db(self):	return self._db
+    @property
+    def path(self):	return self._path
+    @property
+    def cursor(self):
+        if not self._cur: self._cur = self._db.cursor()
+        return self._cur
+
+    def table_exists(self, name):
+        """Query if table exists in DB."""
+        cur = self.cursor
+        sel = f'''SELECT name FROM sqlite_master WHERE type='table' AND name='{name}';'''
+        try:
+            res = cur.execute(sel)
+            for tup in res.fetchall():
+                if type(tup) is type(()):
+                    for t in tup:
+                        if t == name:
+                            debug(1, f'{res=} {tup=} {t=} {t==name=}')
+                            return True
+                        pass
+                    pass
+                pass
+            debug(1, f'{res=} {name in res=}')
+            return False
+        except Exception as e:
+            print(sel)
+            raise Error(e)
         pass
     pass
 
@@ -358,7 +477,6 @@ class Followers(object):
         'followeeProfile': None,
     }
 
-
     @tab.col
     def followerId(self):        return self._data['followerId']
     @tab.col
@@ -404,16 +522,16 @@ class Followers(object):
     @tab.col
     def werp_privateMessaging(self):	return self._werp['privateMessaging']
     @tab.col
-    def werp_defaultFitnessDataPrivacy(self):	return self._werp['defaultFitnessDataPrivacy']
+    def werp_defaultFitnessDataPrivacy(self):		return self._werp['defaultFitnessDataPrivacy']
     @tab.col
     def werp_suppressFollowerNotification(self):	return self._werp['suppressFollowerNotification']
     @tab.col
-    def werp_displayAge(self):			return self._werp['displayAge']
+    def werp_displayAge(self):				return self._werp['displayAge']
     @tab.col
-    def werp_defaultActivityPrivacy(self):	return self._werp['defaultActivityPrivacy']
+    def werp_defaultActivityPrivacy(self):		return self._werp['defaultActivityPrivacy']
 
     @property
-    def wer_socialFacts(self):	return self._wer['socialFacts']
+    def wer_socialFacts(self):		return self._wer['socialFacts']
 
     @tab.col
     def wers_followersCount(self):	return self._wers['followersCount']
@@ -426,7 +544,7 @@ class Followers(object):
     @tab.col
     def wers_followeeStatusOfLoggedInPlayer(self):	return self._wers['followeeStatusOfLoggedInPlayer']
     @tab.col
-    def wers_isFavoriteOfLoggedInPlayer(self):	return self._wers['isFavoriteOfLoggedInPlayer']
+    def wers_isFavoriteOfLoggedInPlayer(self):		return self._wers['isFavoriteOfLoggedInPlayer']
 
     @tab.col
     def wer_worldId(self):			return self._wer['worldId']
@@ -469,10 +587,7 @@ class Followers(object):
         werp = [c[5:]  for c in col if c.startswith('werp_')]
         wers = [c[5:]  for c in col if c.startswith('wers_')]
         rema = [c for c in col if not '_' in c and not c.startswith('wer')]
-        # print('wer:', wer)
-        # print('werp:', werp)
-        # print('wers:', wers)
-        # print('rema:', rema)
+
         werx  = [obj[col.index('wer_'+c)]  for c in wer]
         werpx = [obj[col.index('werp_'+c)] for c in werp]
         wersx = [obj[col.index('wers_'+c)] for c in wers]
@@ -488,7 +603,6 @@ class Followers(object):
         top['followerProfile']['privacy'] = werp
         top['followerProfile']['socialFacts'] = wers
 
-        # print('top:', top)
         return top
 
     def __repr__(self):
@@ -529,51 +643,43 @@ class Followers(object):
     @classmethod
     def table_template(cls):
         cls.tab.change_type('followerId', 'text PRIMARY KEY')
-        return "CREATE TABLE IF NOT EXISTS followers(" + cls.tab.table_template() + ")" # ", addDate text, delDate text)"
+        return "CREATE TABLE IF NOT EXISTS followers(" + cls.tab.table_template() + ")"
 
     @classmethod
     def insert_template(cls, obj, xtra_col='', xtra_val=''):
         ins = "INSERT INTO followers(" + cls.tab.insert_template() + xtra_col + ")\n"
         ins += "VALUES(" + cls.tab.values(obj) + xtra_val + ")"
-        # print('ins:', ins)
         return ins
 
     @classmethod
     def gen_table(cls, db):
         """Generate the sqlite3 table for this class."""
+        verbo(1, f'gen_table({cls=}, {db=})')
         cur = db.cursor()
         try:
-            exe = cls.table_template()
-
-            # print('gen table:', exe)
-            r = cur.execute(exe)
-            # print('r:', r)
+            t = cls.table_template()
+            r = cur.execute(t)
+            verbo(1, f'{r.fetchall()=}')
             db.commit()
             return r
         except db.Error as e:
-            print(e)
-            pass
-        return None
+            print(f'Error: {e}')
+            sys.exit(1)
 
-    def db_insert(self, db):
+    def db_insert(self, db, commit=False):
         """Write the current object to the db table.
         Insert into table columns(...) values(...)"""
         cur = db.cursor()
         try:
-            xtra_col = '' # ", addDate, delDate"
-            xtra_val = '' # ", datetime('now', 'localtime'), ''"
-            cls = self.__class__
-            ins = cls.insert_template(self, xtra_col, xtra_val)
-            r = cur.execute(ins)
-            # print('r:', r)
-            db.commit()
-            return r
-            pass
+           cls = self.__class__
+           t = cls.insert_template(self)
+           r = cur.execute(t)
+           if commit: db.commit()
+           return r
         except db.Error as e:
-            print(ins)
-            print(e)
-            pass
-        return None
+           print(t)
+           print(f'Error: {e}')
+           sys.exit(1)
 
     @classmethod
     def db_colmax(cls, db):
@@ -589,10 +695,9 @@ class Followers(object):
                 res = cur.execute('SELECT ' +c+', length(' +c+ ') FROM followers ORDER BY length(' +c+ ') DESC')
             except Exception as e:
                 # no entries in the DB
-                print('Error:', e)
+                print(f'Error: {e}')
                 print('You may have to run the `reset` command.')
                 sys.exit(1)
-                break
 
             r = res.fetchone()	# is there a way to just return one result in above?
             if r is not None:
@@ -618,8 +723,7 @@ class Followers(object):
         """Extract entries from the database."""
         if cols is None:
             cols = cls.tab._name
-        else:
-            # verify the colums
+        else: # verify the colums
             for c in cols:
                 if not c in cls.tab._name:
                     raise Exception('{}: funny column name'.format(c))
@@ -699,15 +803,45 @@ class Followers(object):
 @click.option('-v', '--verbose', count=True)
 def test(verbose):
     """Perform some modicum of internal tests."""
+    global verbosity
+    verbosity = verbose
+
+    db0 = DataBase.db_connect()
+    db1 = DataBase.db_connect('/tmp/zwi_test.db', reset=True)
+    db2 = DataBase.db_connect('/tmp/zwi_test.db', reset=True)
+    db3 = DataBase.db_connect()
+    print(f'{db0==db3=} {db2!=db3=}')
+    
+    print(f"{db1=} {db1.table_exists('followers')=}")
+    print(f"{db1=} {db1.table_exists('followees')=}")
+    
+    Followers.gen_table(db1.db)
+    Followers.gen_table(db1.db)
+
+    print(f"{db1=} {db1.table_exists('followers')=}")
+    print(f"{db1=} {db1.table_exists('followees')=}")
+
     # slurp in the followers from the DB and reconstitute.
     wers = [a for a in Followers.db_extract(raw=True)()]
 
     count = 0
-    for w in wers:
-        print(w)
-        count += 1
-        if count >= 10:
-            break
+    if len(wers) >= 1:
+        playerId = wers[0][1]
+        for w in wers:
+            count += 1
+            if count <= 10:
+                # just display the first 10
+                print(f'{[w[i] for i in range(8)]}')
+                pass
+            if w[1] != playerId:
+                # sanity check: all these have playerId there
+                print(f'{w[1]=} != {playerId} -- {[w[i] for i in range(8)]}')
+                pass
+            if w[2] != 'IS_FOLLOWING':
+                # sanity check: all these are following
+                print(f'{w[2]=} != {playerId} -- {[w[i] for i in range(8)]}')
+                pass
+            pass
         pass
     pass
 
@@ -716,26 +850,13 @@ def db_setup(reset=False):
     Currently, I only snarf in the followers table.
     Currently, I do not handle updates."""
 
-    extant = os.path.isfile(DBFILE)
-    if reset and extant:
-        extant = False
-        try:
-            os.remove(DBFILE)
-        except Exception as e:
-            print('Error:', e)
-            sys.exit(1)
-            pass
-        pass
+    dbo = DataBase.db_connect(reset=reset)
+    db = dbo.db
 
-    try:	# first, try to create the DB
-        db = sq.connect(DBFILE)
-    except sq.Error as e:
-        print('Error:', e)
-        sys.exit(1)
-        pass
+    nascent = not dbo.table_exists('followers')
+    if nascent:
+        Followers.gen_table(db)
 
-    if not extant:
-        # newly created: slurp down content
         cl, pr = zwi_init()
         vec = []
         start = 0
@@ -757,8 +878,6 @@ def db_setup(reset=False):
         # It appears that more recent followers are returned first above.
         vec.reverse()
 
-        Followers.gen_table(db)
-
         start = 0
         for v in vec:
             w = Followers(v)
@@ -768,6 +887,7 @@ def db_setup(reset=False):
             del w
             pass
         print('')
+        db.commit()
         pass
 
     # determine max column widths
@@ -850,21 +970,14 @@ def gui(verbose):
     pass
   
 if __name__ == '__main__':
-    if not os.path.isdir(ZWIDIR):
-        try:
-            os.mkdir(ZWIDIR)
-            pass
-        except:
-            pass
-        pass
-
-    if not os.path.isdir(ZWIDIR):
-        print('No such directory:', ZWIDIR)
+    try:
+        cli()
+        sys.exit(0)
+    except Exception as e:
+        print(e)
         sys.exit(1)
         pass
-
-    cli()
-    sys.exit(0)
     pass
+
 
 
