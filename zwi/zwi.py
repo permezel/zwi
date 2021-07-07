@@ -145,10 +145,14 @@ def zwi_init():
     return (None, None)
 
 
-def followees(pr, verbose, start=0, lim=5000):
+def followees(pr, verbose, start=0, lim=50000):
     count = 0
     while start < lim:
         fe = pr.request.json('/api/profiles/{}/followees?start={}&limit=200'.format(pr.player_id, start))
+
+        if fe is None or len(fe) == 0:
+            break
+
         for f in fe:
             count += 1
             fep = f['followeeProfile']
@@ -174,10 +178,14 @@ def followees(pr, verbose, start=0, lim=5000):
     print('processed {} followees'.format(count))
     pass
 
-def followers(pr, verbose, start=0, lim=5000):
+def followers(pr, verbose, start=0, lim=50000):
     count = 0
     while start < lim:
         fe = pr.request.json('/api/profiles/{}/followers?start={}&limit=200'.format(pr.player_id, start))
+
+        if fe is None or len(fe) == 0:
+            break
+
         for f in fe:
             count += 1
             fep = f['followerProfile']
