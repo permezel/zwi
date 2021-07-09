@@ -13,6 +13,7 @@
 import sys
 import os
 import sqlite3 as sq
+from datetime import datetime, date, time        
 
 try:
     from zwift import Client
@@ -255,12 +256,93 @@ def csv():
     wers = [Followers(a) for a in Followers.db_extract(raw=True)()]
     return error('Error: not yet finished.  Tomorrow?')
 
-class DataBase(object):
+class EnumCache(object):
+    def __init__(self, db, name='enum'):
+        super().__init__()
+        self._db = db
+        self._name = name
+        self._enumv = {}  # _enum['class']['name'] = val
+        self._enums = {}  # _enum['class'][val] = 'name'
+        return self._setup()
+
+    def enum_set(self, c, k, v):
+        '''map value thru enum cache.'''
+        if not c in self._enumv:
+            self._enumv[c] = {}
+            self._enums[c] = {}
+            pass
+
+        if k in self._enumv[c]:
+            assert self._enumv[c][k] == v
+            assert self._enums[c][v] == k
+        else:
+            self.execute(f'''INSERT INTO {self._name} VALUES('{c}', '{k}', {v});''')
+            self.commit()
+            self._enumv[c][k] = v
+            self._enums[c][v] = k
+            pass
+        return v
+
+    def enum_get(self, c, k):
+        '''If `c[k]` is not currently in the cache, we add it.'''
+        if not c in self._enumv:
+            self._enumv[c] = {}
+            self._enums[c] = {}
+            pass
+        if not k in self._enumv[c]:
+            return self.enum_set(c, k, len(self._enumv[c]))
+        return self._enumv[c][k]
+            
+    def enum_str(self, c, v):
+        return self._enums[c][v]
+
+    def _setup(self):
+        '''Establish table in DB if required.  Cache any extant values.'''
+        self.gen_tables()
+        self.sync_cache()
+        pass
+    
+    def table_exists(self):
+        debug(1, f'enum_table_exists({self=}, {self._name=}, {self._db=})')
+        return self._db.table_exists(self._name)
+
+    def gen_tables(self, drop=False):
+        '''Generate the ENUM table.'''
+        debug(1, f'gen_table({self=}, {self._name=}, {self._db=}, {drop=})')
+
+        if drop:
+            self.drop_tables()
+            pass
+        self.execute(f'''CREATE TABLE IF NOT EXISTS {self._name} (cat INT, name TEXT, val INT, UNIQUE(cat, name), PRIMARY KEY(cat, val)) WITHOUT ROWID;''')
+        self.commit()
+        pass
+
+    def sync_cache(self):
+        try:
+            res = self.execute(f'''SELECT * FROM {self._name};''')
+        except Exception as e:
+            print(f'{e=}')
+            res = []
+            pass
+        
+        for r in res:
+            debug(1, f'{res=}')
+            (c, k, v) = r
+            if c in self._enumv and k in self._enumv[c]: assert self._enumv[c][k] == v
+            else:
+                if not c in self._enumv:
+                    self._enumv[c] = {}
+                    pass
+                self._enumv[c][k] = v
+                pass
+            pass
+        return 
+    pass
+
+class DataBase(EnumCache):
     cache = {}		# DB universe
 
     def __init__(self, path=None, reset=False):
-        self._path = None
-        super().__init__()
         self._path = path = DataBase.db_path(path)
         self._cur  = None
 
@@ -274,9 +356,10 @@ class DataBase(object):
             pass
 
         self._db = DataBase.__db_connect(path, reset)
+        self.execute('PRAGMA foreign_keys=ON;')
+        super().__init__(self._db)
 
         DataBase.cache[path] = self
-        self.execute('PRAGMA foreign_keys=ON;')
         pass
 
     def __del__(self):
@@ -349,11 +432,11 @@ class DataBase(object):
         return False
 
     def execute(self, exe):
-        verbo(1, f'DataBase.execute({exe})')
+        verbo(1, f'{exe}')
         try:
             return self.cursor.execute(exe)
         except Exception as e:
-            print(exe)
+            debug(1, f'{exe}')
             raise Error(f'execute({exe} => {e}')
         pass
         
@@ -372,14 +455,23 @@ class DataBase(object):
 class Table(object):
     '''A class used to manage database columns.'''
 
-    def __init__(self, prefix='', primary=None):
+    def __init__(self, prefix='', primary=None, copy=None):
         super().__init__()
-        self._name = []	# names of columns
-        self._nlen = {}	# max length of items in column
-        self._cfmt = {}	# column print format
-        self._meth = {}	# access method
-        self._prop = {}
-        self._type = {}
+        if copy is not None:
+            self._name = copy._name
+            self._nlen = copy._nlen
+            self._cfmt = copy._cfmt
+            self._meth = copy._meth
+            self._prop = copy._prop
+            self._type = copy._type
+        else:
+            self._name = []	# names of columns
+            self._nlen = {}	# max length of items in column
+            self._cfmt = {}	# column print format
+            self._meth = {}	# access method
+            self._prop = {}
+            self._type = {}
+            pass
         self._pref = prefix
         self._primary_key = primary
         return
@@ -392,7 +484,7 @@ class Table(object):
         '''
         if oth is None: return
 
-        verbo(1, f'{self=} {oth=} {self._name=} {oth._name=}')
+        debug(1, f'{self=} {oth=} {self._name=} {oth._name=}')
         for c in [ c for c in oth._name if c not in self._name ]:
             self._name.append(c)
             self._meth[c] = oth._meth[c]
@@ -405,6 +497,7 @@ class Table(object):
         '''Add a column definition for the table.
         We also incorporate the @property.'''
         name = fun.__name__
+        debug(1, f'col: {self=} {fun=}')
         self._name.append(name)
         self._meth[name] = fun
         self._type[name] = 'TEXT'
@@ -417,6 +510,9 @@ class Table(object):
     def change_type(self, name, text):
         '''Change the column type.'''
         self._type[name] = text
+        if self._primary_key == name:
+            self._type[name] += ' PRIMARY KEY'
+            pass
         pass
 
 #    def __repr__(self):
@@ -433,58 +529,67 @@ class Table(object):
         We need to replace all single ' with double '
         '''
         vals = [str(self._meth[n](obj)).replace("'", "''") for n in self._name]
-        # print('vals:', vals)
         return ', '.join(f"'{a}'" for a in vals)
 
     pass
 
 class Table_v1(Table):
-    def __init__(self, prefix='', primary=None):
-        super().__init__(prefix=prefix, primary=primary)
-        self._enum = {}  # enums
+    def __init__(self, prefix='', primary=None, copy=None):
+        print(f'{self=} {copy=}')
+        super().__init__(prefix=prefix, primary=primary, copy=copy)
+        self._enumc = []  # columns using enum mapping
+        self._alias = {}  # column name aliasing
+        # establish initial alias list based on inderited column names
+        for n in self._name:
+            self.alias(n)
         return
 
-    def enumcol(self, fun):
+    def alias(self, fun, alias=None):
+        '''Add a column name alias.'''
+        if type(fun) is type(''):	# passing in a function name?
+            name = fun
+        else:
+            name = fun.__name__
+            pass
+
+        if alias is None:
+            # default aliasing is to stop off the prefix
+            if '_' in name:
+                alias = name.split('_')[1]
+            else:
+                alias = name
+                pass
+            pass
+        self._alias[name] = alias
+        return
+
+    def enumcol(self, fun, alias=None):
         '''This column uses enum mapping.'''
         if type(fun) is type(''):	# passing in a function name?
-            self._enum[fun] = {}
-            # print(f'enum: {self._enum=}')
-            return
-        name = fun.__name__
-        self._enum[name] = {}
-        return self.col(fun)
+            name = fun
+            rv = None
+        else:
+            name = fun.__name__
+            rv = self.col(fun)
+            pass
+        self._enumc.append(name)
+        self.alias(name, alias)
+        debug(2, f'enumcol: {name=} {alias=} {self._enumc=} {rv=}')
+        return rv
 
     def intcol(self, fun):
         '''This column uses integer mapping.'''
+        print(f'intcol: {self=} {fun=}')
         self.change_type(fun, 'INT')
         return
 
-    def enum_table_exists(self, name, db):
-        verbo(1, f'enum_table_exists({self=}, {name=}, {db=})')
-        return db.table_exists(name)
-        
-    def gen_enum_tables(self, table_name, db, drop=False):
-        '''Generate all the ENUM tables.'''
-        verbo(1, f'gen_enum_tables({self=}, {table_name=}, {db=}, {drop=})')
-
-        for k in self._enum:
-            if drop:
-                db.execute(f'''DROP TABLE IF EXISTS {table_name}_{k}''')
-                # db.execute(f'''DROP TABLE {table_name}_{k} IF EXISTS''')
-                pass
-
-            if not self.enum_table_exists(f'{table_name}_{k}', db):
-                db.execute(f'''CREATE TABLE IF NOT EXISTS {table_name}_{k} (name TEXT PRIMARY KEY NOT NULL, enum INT)''')
-                pass
-            pass
-        return db.commit()
-            
     def table_template(self, table_name):
         '''Generate table with ENUM rows as needed.'''
         typ = self._type.copy()
-        for k in self._enum:
-            #typ[k] += f''' REFERENCES {table_name}_{k}(name)'''
-            typ[k] = f''' INT REFERENCES {table_name}_{k}(name)'''
+        print(f'{self=} {typ=}')
+        for k in self._enumc:
+            # Gave up trying to make REFERENCES work.
+            typ[k] = 'INT'
             pass
         return ', '.join(f'{a} {b}' for (a, b) in zip(self._name, [typ[k] for k in self._name]))
 
@@ -494,25 +599,28 @@ class Table_v1(Table):
     def values(self, obj, table_name, db):
         '''Manage value/enum mappings.'''
         vals = []
-        # print(f'{self._name=}\n{self._enum=}')
-        for n in self._name:
-            if n in ['addDate', 'delDate']: continue
-            val = str(self._meth[n](obj)).replace("'", "''")
-            if n in self._enum:
+        debug(3, f'values: {self._name=}')
+        for col in self._name:
+            # if n in ['addDate', 'delDate']: continue
+            val = str(self._meth[col](obj)).replace("'", "''")
+            if col in self._enumc:
                 # this value uses enum mapping: make sure we have one defined
-                # print(f'{n=} {val=} {type(val)=} {self._enum[n]=}')
-                if not val in self._enum[n]:
-                    self._enum[n][val] = len(self._enum[n])
-                    # no current enum definition: put one in the DB
-                    db.execute(f'''INSERT INTO {table_name}_{n} VALUES('{val}', {self._enum[n][val]});''')
-                    db.commit()
-                    # val = str(self._enum[n][val])
-                    pass
+                col_enum = db.enum_get(0, col)
+                val = db.enum_get(col_enum, val)
                 pass
+
             vals.append(val)
             pass
-        # print('vals:', vals)
-        return ', '.join(f"'{a}'" for a in vals) + ''', datetime('now', 'localtime'), 'not yet' '''
+        debug(3, f'vals: {vals}')
+        # Here we single quote the values.
+        # We are relying on SQLite3 to coerce the values approriately.
+        # XXX: am I sure I handle 'hi''there''''' correctly?
+        #
+        # If I wish to use enum mapping for the date/time cols, I need to gen the
+        # time val myself.
+        # return ', '.join(f"'{a}'" for a in vals) + ''', datetime('now', 'localtime'), 'not yet' '''
+        # 
+        return ', '.join(f"'{a}'" for a in vals)
     pass
 
 class Followers(object):
@@ -697,8 +805,8 @@ class Followers(object):
 
     def __init__(self, w=None):
         super().__init__()
-        self._addDate = ''
-        self._delDate = ''
+        self._addDate = datetime.now().isoformat(timespec='minutes')
+        self._delDate = 'later'
 
         # The initialiser is either None, a type({}) or a type(()) (or type([]))
         #
@@ -733,7 +841,7 @@ class Followers(object):
 
     @classmethod
     def table_template(cls):
-        cls.tab.change_type('followerId', 'text PRIMARY KEY')
+        # cls.tab.change_type('followerId', 'text PRIMARY KEY')
         verbo(1, f"CREATE TABLE IF NOT EXISTS {cls.table_name}({cls.tab.table_template(cls.table_name)})")
         return f"CREATE TABLE IF NOT EXISTS {cls.table_name}({cls.tab.table_template(cls.table_name)});"
 
@@ -745,11 +853,11 @@ class Followers(object):
     @classmethod
     def gen_table(cls, db, drop=False):
         '''Generate the sqlite3 table for this class.'''
-        verbo(1, f'gen_table({cls=}, {db=}, {drop=})')
+        debug(1, f'gen_table({cls=}, {db=}, {drop=})')
         if drop: db.execute(f'''DROP TABLE IF EXISTS {cls.table_name};''')
         t = cls.table_template()
         r = db.execute(t)
-        verbo(1, f'{r.fetchall()=}')
+        debug(1, f'{r.fetchall()=}')
         db.commit()
         return r
 
@@ -800,6 +908,28 @@ class Followers(object):
         pass
 
     @classmethod
+    def _db_extract(cls, db, cols, arraysize=200):
+        '''Extract entries from the database.'''
+
+        sel = ', '.join(f'{a}' for a in cols)
+        r = db.execute(f'''SELECT {sel} FROM {cls.table_name} ORDER BY rowid''')
+
+        def gen():
+            while True:
+                ar = r.fetchmany(arraysize)
+
+                if not ar:
+                    break
+                for e in ar:
+                    yield e
+                    pass
+                pass
+            pass
+
+        return gen
+
+
+    @classmethod
     def db_extract(cls, db=None, cols=None, arraysize=200, raw=False):
         '''Extract entries from the database.'''
         if cols is None:
@@ -821,15 +951,15 @@ class Followers(object):
             sys.exit(1)
             pass
 
+
         # generate the format string
         #fmt = ' '.join(['{:>%d.%ds}' % (l, l) for l in [cls.tab._nlen[c] for c in cols]])
         fmt = ' '.join(f for f in [cls.tab._cfmt[c] for c in cols])
         hdr = fmt.format(*cols)
-        cur = db.cursor
         sel = ', '.join(f'{a}' for a in cols)
 
         try:
-            r = cur.execute(f'''SELECT {sel} FROM {cls.table_name} ORDER BY rowid''')
+            r = db.execute(f'''SELECT {sel} FROM {cls.table_name} ORDER BY rowid''')
         except Exception as e:
             print('Warning:', e)
             print(f'Warning: cannot SELECT from table `{cls.table_name}`')
@@ -841,7 +971,7 @@ class Followers(object):
             def rgen():
                 # xxx: DO NOT: yield cols for raw
                 while True:
-                    ar = cur.fetchmany(arraysize)
+                    ar = r.fetchmany(arraysize)
 
                     if not ar:
                         break
@@ -855,7 +985,7 @@ class Followers(object):
 
             yield hdr
             while True:
-                ar = cur.fetchmany(arraysize)
+                ar = r.fetchmany(arraysize)
 
                 if not ar:
                     break
@@ -887,7 +1017,7 @@ class Followers_v1(Followers):
     	* use of ENUMs for certain column data in DB
     '''
 
-    tab = Table_v1(primary='followerId')
+    tab = Table_v1(primary='followerId', copy=Followers.tab)
 
     def __init__(self, w=None):
         if isinstance(w, Followers):
@@ -905,21 +1035,68 @@ class Followers_v1(Followers):
     @classmethod
     def gen_table(cls, db, drop=False):
         '''Generate the sqlite3 table for this class.'''
-        cls.gen_enum_table(db, drop)
+        # cls.gen_enum_table(db, drop)
         return super().gen_table(db, drop)
-
-    @classmethod
-    def gen_enum_table(cls, db, drop=False):
-        return cls.tab.gen_enum_tables(cls.table_name, db, drop=drop)
 
     def values(self, db):
         print(f'values - {self=}, {db=} {self.tab=}')
         return self.tab.values(self, self.table_name, db)
     
+    @classmethod
+    def db_extract(cls, db=None, cols=None, arraysize=200, raw=False):
+        '''Extract entries from the database.'''
+
+        assert db is not None
+        if cols is None: cols = cls.tab._name
+
+        # generate the format string
+        fmt = ' '.join(f for f in [cls.tab._cfmt[c] for c in cols])
+        hdr = fmt.format(*[cls.tab._alias[c] for c in cols])
+        print(f'{[cls.tab._alias[c] for c in cols]}')
+
+        g = cls._db_extract(db, cols, arraysize)
+
+        def gen():
+            import unicodedata
+
+            if not raw: yield hdr
+
+            for e in g():
+                # map back thru enum cache
+                for i in range(len(e)):
+                    c = cols[i]
+                    if c in cls.tab._enumc:
+                        if type(e) is not type([]): e = [*e]
+                        e[i] = db.enum_str(db.enum_get(0, c), e[i])
+                        pass
+                    if not raw and type(e[i]) is type('') and not e[i].isascii():
+                        if type(e) is not type([]): e = [*e]
+                        e[i] = unicodedata.normalize('NFKD', e[i]).encode('ascii', 'ignore').decode()
+                        pass
+                    pass
+                if raw: yield e
+                else:
+                    try:
+                        yield fmt.format(*[str(x) for x in e])
+                    except Exception as ex:
+                        print(f'{ex}')
+                        print(f'{fmt=}')
+                        print(f'{e}')
+                        error('')
+                        pass
+                    pass
+                pass
+            pass
+
+        # return the generator
+        return gen
+
     # these entries are to be treated as enums
     tab.enumcol('status')
-    tab.enumcol('isFolloweeFavoriteOfFollower')
+    tab.enumcol('isFolloweeFavoriteOfFollower', 'favorite')
     tab.enumcol('wer_male')
+    tab.enumcol('wer_firstName')
+    tab.enumcol('wer_lastName')
     tab.enumcol('wer_playerType')
     tab.enumcol('wer_countryAlpha3')
     tab.enumcol('wer_useMetric')
@@ -940,8 +1117,12 @@ class Followers_v1(Followers):
     tab.enumcol('wer_playerSubTypeId')
     tab.enumcol('wer_currentActivityId')
     tab.enumcol('wer_likelyInGame')
+    tab.enumcol('addDate')
+    tab.enumcol('delDate')
 
     # these are ints
+    tab.intcol('followerId')
+    tab.intcol('followeeId')
     tab.intcol('wer_countryCode')
     tab.intcol('wers_followersCount')
     tab.intcol('wers_followeesCount')
@@ -1001,9 +1182,25 @@ def test():
         v1 = Followers_v1(w)
         v1.db_insert(db1)
         wers_v1.append(v1)
-#        if count >= 10:
-#            break
+        got = False
+        try:
+            v1.db_insert(db1)
+            v1.db_insert(db1)
+            v1.db_insert(db1)
+        except Exception as e:
+            debug(3, f'expected exception: {e!r}')
+            got = True
+            pass
+
+        if not got:
+            db1.commit()
+            return error('no exception on multiple inserts.')
+
+        if count >= 100: break
+            
+        # v1.db_update(db1, v1)
         pass
+   
     db1.commit()
     Followers_v1.db_colmax(db1)
 
@@ -1023,11 +1220,13 @@ def test():
                 pass
             if w[2] != 'IS_FOLLOWING':
                 # sanity check: all these are following
-                print(f'{w[2]=} != {playerId} -- {[w[i] for i in range(8)]}')
+                print(f'''{w[2]=} != 'IS_FOLLOWING' -- {[w[i] for i in range(8)]}''')
                 pass
             pass
         pass
 
+    setup(1,1)
+    _gui(db1)
     db1.close()
 
     pass
@@ -1091,6 +1290,9 @@ def reset():
 def gui():
     '''Pop up a GUI window, displaying results from the DB.'''
 
+    return _gui(db=None)
+
+def _gui(db=None):
     import sqlite3 as sq
     import tkinter as tk
     from tkinter.constants import RIGHT, LEFT, Y, BOTH, END, ALL
@@ -1098,15 +1300,10 @@ def gui():
     from tkinter.font import Font
 
     class GuiApp(tk.Frame):
-        def __init__(self, master=None):
+        def __init__(self, db, master=None):
             self._buttons = {}
             self._fonts = {}
-            try:
-                self._db = db_setup()
-            except sq.Error as e:
-                print(e)
-                return None
-
+            self._db = db
             super().__init__(master)
             self.master = master
             self.pack()
@@ -1131,7 +1328,7 @@ def gui():
         def refresh(self):
             b = self._box
             
-            rows = Followers.db_extract(self._db, ['followerId', 'wer_firstName', 'wer_lastName', 'wer_playerType', 'isFolloweeFavoriteOfFollower'])
+            rows = Followers_v1.db_extract(self._db, ['followerId', 'wer_firstName', 'wer_lastName', 'wer_playerType', 'isFolloweeFavoriteOfFollower'])
 
             b.configure(state='normal')
             b.delete('1.0', END)
@@ -1150,7 +1347,9 @@ def gui():
             pass
         pass
 
-    gui = GuiApp(master=tk.Tk())
+    if not db: db = DataBase.db_connect()
+
+    gui = GuiApp(db, master=tk.Tk())
     gui.mainloop()
     pass
   
@@ -1159,7 +1358,7 @@ if __name__ == '__main__':
         cli()
         sys.exit(0)
     except Exception as e:
-        verbo(1, f'{type(e)=}\n{e!r}')
+        debug(1, f'{type(e)=}\n{e!r}')
         print(f'{e}')
         if debug_lvl > 0:
             raise Exception('oops!') from e
