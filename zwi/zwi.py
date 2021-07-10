@@ -36,23 +36,23 @@ def debug(lvl, fmt, *args):
     return
 
 class Error(Exception):
-    def __init__(self, fmt, *args):
-        self.data = fmt % args
+    def __init__(self, data):
+        self.data = data
         pass
 
     def __str__(self):
-        return self.data
+        return f'{self.data!s}'
 
     def __repr__(self):
-        return 'Error(' + self.data + ')'
+        return f'{self.data!r}'
     pass
 
-def error(fmt, *args):
-    debug(9, 'error: %r' % (fmt % args))
-    raise Error(fmt, *args)
+def error(data):
+    debug(9, f'error: {data!s}')
+    raise Error(data)
 
-def warn(fmt, *args):
-    sys.stderr.write('warning: ' + fmt % args + '\n')
+def warn(data):
+    sys.stderr.write(f'warning: {data!s}\n')
     return
 
 @click.group()
@@ -69,9 +69,8 @@ def auth(name, password):
         cl = Client(name, password)
         pr = cl.get_profile()
         pr.check_player_id()
-    except:
-        print('Authentication failure.')
-        sys.exit(1)
+    except Exception as e:
+        error(f'Authentication failure: {e}')
         pass
 
     try:
@@ -194,8 +193,7 @@ def zwi_init():
         print('Authentication failure for user {}.'.format(name))
         sys.exit(1)
         pass
-
-    return (None, None)
+    pass
 
 
 def followees(verbose):
@@ -356,6 +354,7 @@ class DataBase(object):
             del DataBase.cache[self._path]
             pass
 
+    @staticmethod
     def db_path(path=None):
         """Return the path name."""
         if path is None:
@@ -364,6 +363,7 @@ class DataBase(object):
             pass
         return path
 
+    @staticmethod
     def __db_connect(path, reset=False):
         """Setup DB for access."""
 
@@ -608,7 +608,7 @@ class Followers(object):
     def __repr__(self):
         return str(self._data)
 
-    def __init__(self, w=template):
+    def __init__(self, w=None):
         super().__init__()
         self._addDate = ''
         self._delDate = ''
@@ -618,7 +618,7 @@ class Followers(object):
         # type({}): wire format
         # type(()): db-format
         #
-        if w is None: w = template
+        if w is None: w = Followers.template
 
         if type(w) is not type({}):
             # need to convert the db-format to wire-format
@@ -670,9 +670,9 @@ class Followers(object):
         """Write the current object to the db table.
         Insert into table columns(...) values(...)"""
         cur = db.cursor()
+        cls = self.__class__
+        t = cls.insert_template(self)
         try:
-           cls = self.__class__
-           t = cls.insert_template(self)
            r = cur.execute(t)
            if commit: db.commit()
            return r
@@ -908,7 +908,7 @@ def gui(verbose):
 
     import sqlite3 as sq
     import tkinter as tk
-    from tkinter.constants import RIGHT, LEFT, Y, BOTH, END, ALL
+    from tkinter.constants import RIGHT, BOTH, LEFT, END
     from tkinter.scrolledtext import ScrolledText
     from tkinter.font import Font
 
@@ -920,7 +920,7 @@ def gui(verbose):
                 self._db = db_setup()
             except sq.Error as e:
                 print(e)
-                return None
+                return
 
             super().__init__(master)
             self.master = master
