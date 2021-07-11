@@ -14,6 +14,7 @@ import sys
 import os
 import sqlite3 as sq
 from datetime import datetime
+from dataclasses import dataclass, asdict, astuple, fields
 
 try:
     from zwift import Client
@@ -470,6 +471,21 @@ class DataBase(EnumCache):
         except Exception as e:
             debug(2, f'{exe}')
             raise Error(f'execute({exe} => {e}')
+        pass
+
+    def drop_table(self, name):
+        self.execute(f'DROP TABLE IF EXISTS {name};')
+
+    def create_table(self, name, zwi):
+        """Using the `zwi` as template, generate a table."""
+        def fun(f, x, arg):
+            if x.type in (int, bool, str):
+                arg.append(x.name)
+                pass
+            pass
+
+        cols = zwi.traverse(fun, [])
+        print(f'{cols=}')
         pass
 
     def commit(self):
@@ -1241,6 +1257,251 @@ class Followers_v1(Followers):
     pass
 
 
+class ZwiBase(object):
+    """base class for Zwi @dataclass objects."""
+
+    def traverse(self, fun, arg, kluge=0):
+        """traverse structure built by the default __init__."""
+        for x in fields(self):
+            if x.type in (int, str, bool):
+                fun(self, x, arg)
+            elif isinstance(x.type(), ZwiBase):
+                fun(self, x, arg)
+                pass
+            pass
+        return arg
+
+    @staticmethod
+    def from_dict(f, x, arg):
+        """Assign values from a supplied dict()."""
+        if x.name in arg:
+            print(f'{x.name=} {x.type=} {arg[x.name]=}')
+            if x.type in (int, bool):
+                exec(f'f.{x.name} = {arg[x.name]}')
+            elif x.type is str:
+                exec(f"f.{x.name} = '''{arg[x.name]}'''")
+            elif isinstance(x.type(), ZwiBase):
+                # we expect that self.<value> here is a suitable dict
+                f0 = eval(f'self.{x.name}')
+                if f0 is not None and x.name in arg:
+                    print(f'dict: {f0=} {arg[x.name][:2]=}')
+                    f0.traverse(ZwiBase.from_dict, arg[x.name])
+                else:
+                    raise SysException(f'oops')
+                pass
+            else:
+                raise SysException(f'Unexpected type: {x.type=}')
+            pass
+        return arg
+    
+    @staticmethod
+    def to_dict(f, x, arg):
+        """Assing values to a supplied dict().
+        Does not construct the dict or add any missing fields."""
+        if x.name in arg:
+            # print(f'{x.name=} {x.type=} {arg[x.name]=}')
+            if x.type in (int, bool):
+                arg[x.name] = eval(f'f.{x.name}')
+            elif x.type is str:
+                arg[x.name] = eval(f'f.{x.name}')
+            elif isinstance(x.type(), ZwiBase):
+                # we expect that self.<value> here is a suitable dict
+                f0 = eval(f'f.{x.name}')
+                if f0 is not None:
+                    print(f'dict: {f0=} {arg[x.name]=}')
+                    f0.traverse(f.to_dict, arg[x.name])
+                    pass
+                pass
+            else:
+                raise SysException(f'Unexpected type: {x.type=}')
+            pass
+        return arg
+
+    def from_seq(f, x, arg):
+        """Assign values from a sequence.
+        We perform a depth-first traversal, and pop successive values from the sequence."""
+        # print(f'{x.name=} {x.type=}')
+        if x.type in (int, bool):
+            exec(f'f.{x.name} = {arg.pop()}')
+        elif x.type is str:
+            exec(f"f.{x.name} = '''{arg.pop()}'''")
+        elif isinstance(x.type(), ZwiBase):
+            # decide what we need the recursion to do:
+            f0 = eval(f'f.{x.name}')
+            print(f'from_seq: {x.name=} {f0}')
+            if f0 is not None:
+                f0.traverse(f0.from_seq, arg)
+                pass
+            raise SysException('logic error')
+        else:
+            raise SysException(f'Unexpected type: {x.type=}')
+        return arg
+    
+    pass
+
+
+@dataclass
+class ZwiFollowers(ZwiBase):
+    # id:					int = 0
+    followerId:				int = 0
+    followeeId:				int = 0
+    status:				str = ''
+    isFolloweeFavoriteOfFollower:	bool = False
+
+    @dataclass
+    class FollowerProfile(ZwiBase):
+        # id:			int = 0
+        publicId:		str = ''
+        firstName:		str = ''
+        lastName:		str = ''
+        male:			bool = True
+        imageSrc:		str = ''
+        imageSrcLarge:		str = ''
+        playerType:		str = ''
+        countryAlpha3:		str = ''
+        countryCode:		int = 0
+        useMetric:		bool = True
+        riding:			bool = False
+
+        @dataclass
+        class Privacy(ZwiBase):
+            approvalRequired:			bool = False
+            displayWeight:			bool = False
+            minor:				bool = False
+            privateMessaging:			bool = False
+            defaultFitnessDataPrivacy:		bool = False
+            suppressFollowerNotification:	bool = False
+            displayAge:				bool = True
+            defaultActivityPrivacy:		str = ''
+
+            pass
+
+
+        privacy: Privacy = Privacy()
+
+        @dataclass
+        class SocialFacts(ZwiBase):
+            #profileId:				int = 0
+            followersCount:			int = 0
+            followeesCount:			int = 0
+            followeesInCommonWithLoggedInPlayer:int = 0
+            followerStatusOfLoggedInPlayer:	str = ''
+            followeeStatusOfLoggedInPlayer:	str = ''
+            isFavoriteOfLoggedInPlayer:		bool = True
+            pass
+
+
+        socialFacts: SocialFacts = SocialFacts()
+        worldId:		int = 0
+        enrolledZwiftAcademy:	bool = False
+        playerTypeId:		int = 0
+        playerSubTypeId:	int = 0
+        currentActivityId:	int = 0
+        likelyInGame:		bool = False
+        pass
+
+    profile: FollowerProfile = FollowerProfile()
+
+    addDate:			str = ''
+    delDate:			str = ''
+    pass
+
+wees = {'id': 0, 'followerId': 1277086, 'followeeId': 4005239, 'status': 'IS_FOLLOWING', 'isFolloweeFavoriteOfFollower': True, 'followerProfile': None, 'followeeProfile': {'id': 4005239, 'publicId': 'b1aaff40-2f9b-4524-9fe9-1cd4df557cd2', 'firstName': 'W', 'lastName': 'Watopian in Review', 'male': False, 'imageSrc': None, 'imageSrcLarge': None, 'playerType': 'NORMAL', 'countryAlpha3': 'twn', 'countryCode': 158, 'useMetric': True, 'riding': False, 'privacy': {'approvalRequired': False, 'displayWeight': False, 'minor': False, 'privateMessaging': False, 'defaultFitnessDataPrivacy': False, 'suppressFollowerNotification': False, 'displayAge': False, 'defaultActivityPrivacy': 'PUBLIC'}, 'socialFacts': {'profileId': 4005239, 'followersCount': 1248, 'followeesCount': 2758, 'followeesInCommonWithLoggedInPlayer': 43, 'followerStatusOfLoggedInPlayer': 'IS_FOLLOWING', 'followeeStatusOfLoggedInPlayer': 'IS_FOLLOWING', 'isFavoriteOfLoggedInPlayer': True}, 'worldId': None, 'enrolledZwiftAcademy': False, 'playerTypeId': 1, 'playerSubTypeId': None, 'currentActivityId': None, 'likelyInGame': False}}
+
+class ZwiUser(object):
+    """Zwift user model."""
+    def __init__(self, db, drop=False):
+        self._db = db
+        self._wers = []
+        self._wees = []
+        self._cl, self._pr = zwi_init()
+        self._setup(drop)
+        pass
+
+    def _setup(self, drop):
+        """Syncronise with the local DB version of the world."""
+        if drop:
+            db.drop_table('followers')
+            db.drop_table('followees')
+            db.drop_table('enum')	# XXX: not here
+            pass
+
+        db.create_table('followers', ZwiFollowers)
+        db.create_table('followees', ZwiFollowers)
+
+        self._slurp(self._wers, 'followers')
+        self._slurp(self._wees, 'followees')
+        pass
+
+    def _slurp(self, cache, tab):
+        """Slurp in the table data."""
+        pass
+
+    def update(self, cache, tab):
+        vec = []
+        start = 0
+        while True:
+            fe = self._pr.request.json(f'/api/profiles/{self._pr.player_id}/{tab}?start={start}&limit=200')
+            if len(fe) == 0:
+                break
+
+            for f in fe:
+                start += 1
+                vec.append(f)
+                pass
+            print('\rprocessed followers: {:d}'.format(start), end='')
+            pass
+        print('')
+
+        # I want to add these into the DB in historical order.
+        # It appears that more recent followers are returned first above.
+        vec.reverse()
+
+        start = 0
+        for v in vec:
+            w = Followers(v)
+            w.db_insert(db)
+            start += 1
+            print('\rprocessed followers: {:d}'.format(start), end='')
+            del w
+            pass
+        print('')
+        db.commit()
+        pass
+    pass
+
+    
+@cli.command()
+def devel():
+    """Try out some devel options."""
+
+    f = ZwiFollowers()
+
+    init = asdict(f)
+    
+    f.traverse(ZwiBase.from_dict, Followers.template)
+    d = f.traverse(ZwiBase.to_dict, init)
+    
+    print(f'{f=}')
+    print(f'{d=}')
+
+    def fun(f, x, arg):
+        if x.type in (int, bool, str):
+            arg.append(x.name)
+        elif isinstance(x.type(), ZwiBase):
+            f0 = eval(f'f.{x.name}')
+            if f0 is not None:
+                f0.traverse(fun, arg)
+                pass
+            pass
+        pass
+
+    cols = f.traverse(fun, [])
+    print(f'{cols=}')
+    cols.sort()
+    print(f'{cols=}')
+    pass
+
 @cli.command()
 def test():
     """Perform some modicum of internal tests."""
@@ -1255,7 +1516,9 @@ def test():
     db1 = DataBase.db_connect('/tmp/zwi_test.db', reset=True)
     db2 = DataBase.db_connect('/tmp/zwi_test.db', reset=True)
     db3 = DataBase.db_connect()
-    print(f'{db0==db3=} {db2!=db3=}')
+
+    assert db0==db3
+    assert db2!=db3
 
     print(f"{db1=} {db1.table_exists('followers')=}")
     print(f"{db1=} {db1.table_exists('followees')=}")
