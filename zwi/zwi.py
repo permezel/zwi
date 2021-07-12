@@ -270,13 +270,32 @@ def followers():
     pass
 
 
+@click.option('--wers', is_flag=True)
+@click.option('--wees', is_flag=True)
 @cli.command()
-def csv():
-    """Generate CVS output, full table.
-    (currently only `followers`)."""
+def csv(wers, wees):
+    """Generate CVS output, full table.  Writes to stdout."""
+    import csv
 
-    # wers = [Followers(a) for a in Followers.db_extract(raw=True)()]
-    raise SystemExit('Error: not yet finished.  Tomorrow?')
+    usr = ZwiUser()
+
+    if wers:
+        rows = usr._wers
+    elif wees:
+        rows = usr._wees
+    else:
+        raise SystemExit('No table selected.')
+        pass
+    
+    with sys.stdout as out:
+        writer = csv.DictWriter(out, fieldnames=usr._cols)
+        writer.writeheader()
+        for r in rows:
+            d = dict(zip(usr._cols, r))
+            writer.writerow(d)
+            pass
+        pass
+    pass
 
 
 class EnumCache(object):
@@ -494,6 +513,25 @@ class DataBase(EnumCache):
         self.commit()
         return
 
+    def table_rows(self, name, cols, arraysize=200):
+        """Return a generator for the specified rows in the named table."""
+        sel = ', '.join(f'{a}' for a in cols)
+        r = self.execute(f'SELECT {sel} FROM {name} ORDER BY rowid')
+
+        def gen():
+            while True:
+                ar = r.fetchmany(arraysize)
+
+                if not ar:
+                    break
+                for e in ar:
+                    yield e
+                    pass
+                pass
+            pass
+
+        return gen
+        
     def commit(self):
         return self.db.commit()
 
@@ -683,18 +721,18 @@ class ZwiFollowers(ZwiBase):
         raise Exception(f'funny type of {data!r}')
     
     @classmethod
-    def column_names(cls, pk='', insert=False):
+    def column_names(cls, pk='', create=False):
         """generate the columnt list for a DB create."""
         tmap = {int: 'INT', bool: 'INT', str: 'TEXT'}
         
         def fun(f, x, arg):
             """Function to enumerate the column names."""
             if x.type in (int, bool, str):
-                if insert:			# INSERT usage
+                if not create:			# INSERT/SELECT usage
                     arg.append(f'{x.name}')	# .. no type
-                elif x.name == pk:
+                elif x.name == pk:		# CREATE and PRIMARY
                     arg.append(f'{x.name} {tmap[x.type]} PRIMARY KEY')
-                else:
+                else:				# CREATE, no PRIMARY
                     arg.append(f'{x.name} {tmap[x.type]}')
             elif isinstance(x.type(), ZwiBase):
                 f0 = getattr(f, x.name)
@@ -744,24 +782,36 @@ __wees = {'id': 0, 'followerId': 1277086, 'followeeId': 4005239, 'status': 'IS_F
 
 class ZwiUser(object):
     """Zwift user model."""
-    def __init__(self, db, drop=False):
+    def __init__(self, db=None, drop=False, update=False):
         self._db = db
         self._wers = []
         self._wees = []
-        self._cl, self._pr = zwi_init()
-        self._setup(drop)
+        self._cols = ZwiFollowers.column_names()
+        # self._cl, self._pr = zwi_init()
+        self._cl = None
+        self._pr = None
+        self._setup(drop, update)
         pass
 
-    def _setup(self, drop):
+    def _setup(self, drop, update):
         """Syncronise with the local DB version of the world."""
+        if self._db is None:	# attach to the usual DB
+            self._db = DataBase.db_connect()
+            pass
+
         if drop:
             db.drop_table('followers')
             db.drop_table('followees')
             db.drop_table('enum')	# XXX: not here
             pass
 
-        self._db.create_table('followers', ZwiFollowers.column_names(pk='followerId'))
-        self._db.create_table('followees', ZwiFollowers.column_names(pk='followeeId'))
+        self._db.create_table('followers', ZwiFollowers.column_names(create=True, pk='followerId'))
+        self._db.create_table('followees', ZwiFollowers.column_names(create=True, pk='followeeId'))
+
+        if update:  # update from Zwift?
+            usr.update('followers', usr.wers_fac)
+            usr.update('followees', usr.wees_fac)
+            pass
 
         self._slurp(self._wers, 'followers')
         self._slurp(self._wees, 'followees')
@@ -769,6 +819,18 @@ class ZwiUser(object):
 
     def _slurp(self, cache, tab):
         """Slurp in the table data."""
+        g = self._db.table_rows(tab, self._cols)
+        count = 0
+        for r in g():
+            cache.append(r)
+            count = count + 1
+            if count <= 10 and verbosity >= 2:
+                verbo(2, f'{r=}')
+            elif verbosity >= 1:
+                print(f'\rslurped {tab}: {count}', end='')
+                pass
+            pass
+        verbo(1, '')
         pass
 
     def update(self, tab, factory):
@@ -783,9 +845,11 @@ class ZwiUser(object):
                 start += 1
                 vec.append(f)
                 pass
-            print('\rprocessed followers: {:d}'.format(start), end='')
+            if verbosity >= 1:
+                print(f'\rprocessed {tab}: {start}', end='')
+                pass
             pass
-        print('')
+        verbo(1, '')
 
         # I want to add these into the DB in historical order.
         # It appears that more recent followers are returned first above.
@@ -794,11 +858,11 @@ class ZwiUser(object):
         start = 0
         for v in vec:
             w = factory(v)
-            self._db.row_insert(tab, w.column_names(insert=True), w.column_values())
+            self._db.row_insert(tab, w.column_names(), w.column_values())
             start += 1
-            print('\rprocessed followers: {:d}'.format(start), end='')
+            verbo(1, f'\rprocessed {tab}: {start}', end='')
             pass
-        print('')
+        verbo(1, '')
         return
 
     def wers_fac(self, v):
@@ -819,14 +883,8 @@ class ZwiUser(object):
 def devel():
     """Try out some devel options."""
 
-    f = ZwiFollowers()
-    f.traverse(ZwiBase.from_dict, __wees)
-    f.traverse(ZwiBase.from_dict, __wers)
-
     db = DataBase.db_connect()
-    usr = ZwiUser(db)
-    usr.update('followers', usr.wers_fac)
-    usr.update('followees', usr.wees_fac)
+    usr = ZwiUser(db, drop=False, update=False)
 
     if True: return
 
@@ -870,6 +928,10 @@ def test():
         print(f'{e!r}: oops!')
         pass
 
+    f = ZwiFollowers()
+    f.traverse(ZwiBase.from_dict, __wees)
+    f.traverse(ZwiBase.from_dict, __wers)
+
     db0 = DataBase.db_connect()
     db1 = DataBase.db_connect('/tmp/zwi_test.db', reset=True)
     db2 = DataBase.db_connect('/tmp/zwi_test.db', reset=True)
@@ -882,7 +944,7 @@ def test():
     print(f"{db1=} {db1.table_exists('followees')=}")
 
     setup(1, 1)
-    _gui(db1)
+    _gui(db0)
     db1.close()
 
     pass
@@ -939,8 +1001,11 @@ def db_setup(reset=False):
 
 @cli.command()
 def reset():
-    """Reset the database."""
-    DataBase.db_connect(reset=True)
+    """Reset the database, refresh followers/followees data."""
+
+    db = DataBase.db_connect(reset=True)
+    usr = ZwiUser(db, update=True)
+
     return 0
 
 
