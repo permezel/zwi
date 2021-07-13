@@ -798,10 +798,12 @@ def gui():
     try:
         import PyQt5
         from PyQt5.QtWidgets import QApplication, QWidget, QPushButton, QVBoxLayout, QTableWidget
-        from PyQt5.QtCore import pyqtSignal, QPointF, QRect, QSize, Qt, QRunnable, QThreadPool, QMutex, QSemaphore
-        from PyQt5.QtGui import QPainter, QPolygonF, QIcon, QPixmap, QBrush, QPen, QColor
+        from PyQt5.QtCore import (pyqtSignal, QPointF, QRect, QSize, Qt,
+                                  QRunnable, QThreadPool, QMutex, QSemaphore)
+        from PyQt5.QtGui import (QPainter, QPolygonF, QIcon, QPixmap, QBrush, QPen, QColor, QFont)
         from PyQt5.QtWidgets import (QAbstractItemView, QApplication, QStyle,
-                                     QStyledItemDelegate, QTableWidget, QTableWidgetItem, QWidget)
+                                     QStyledItemDelegate, QTableWidget, QTableWidgetItem, QWidget,
+                                     QStyleOptionViewItem)
         import shutil
         import urllib.request
         import ssl
@@ -845,6 +847,11 @@ def gui():
         pass
 
     class ZwiDelegate(QStyledItemDelegate):
+        def __init__(self, tab, *args, **kwargs):
+            super(ZwiDelegate, self).__init__(*args, **kwargs)        
+            self._tab = tab
+            pass
+
         def paint(self, painter, option, index):
             # print(f'paint {option=} {index=} {index.row()=} {index.column()=}')
             if index.column() == 0:
@@ -864,10 +871,27 @@ def gui():
             return
 
         def sizeHint(self, option, index):
-            # print(f'sizeHint: {option=} {index=} {index.row()=} {index.column()=}')
-            if index.column() == 0:
+            if True and index.column() == 0:
+                # seems to set the with
                 return QSize(256, 256)
-            return super(ZwiDelegate, self).sizeHint(option, index)
+            size = super(ZwiDelegate, self).sizeHint(option, index)
+            if False and index.column() == 0:
+                # does not help
+                print(f'sizeHint: {option=} {index=} {index.row()=} {index.column()=}')
+                total_width = self._tab.viewport().size().width()
+                calc_width = size.width()
+                for i in range(self._tab.columnCount()):
+                    if i != index.column():
+                        option_ = QStyleOptionViewItem()
+                        index_  = self._tab.model().index(index.row(), i)
+                        self.initStyleOption(option_, index_)
+                        size_ = self.sizeHint(option_, index_)
+                        calc_width += size_.width()
+                        pass
+                    pass
+                if calc_width < total_width:
+                    size.setWidth(size.width() + total_width - calc_width)
+            return size
 
         def createEditor(self, parent, option, index):
             """Do not create editor: all are read-only."""
@@ -896,9 +920,9 @@ def gui():
     class ImageCache(QRunnable):
         def __init__(self, sig):
             super().__init__()
-            self._queue = []
-            self._done = []
-            self._cache = {}
+            self._queue = list()
+            self._done = list()
+            self._cache = dict()
             self._context = self._ssl_kluge()
             self._threads = list()
             self._path = get_zdir('.image-cache')
@@ -911,7 +935,7 @@ def gui():
             self._nthreads = 0
             pass
 
-        def load(self, key, widget):
+        def load(self, key, widget, tab):
             """Load an image into the cache."""
             self._mux.lock()
             if key in self._cache:
@@ -920,7 +944,7 @@ def gui():
                 icon = QIcon()
                 self._cache[key] = icon
 
-                self._queue.insert(0, (key, widget, icon))
+                self._queue.insert(0, (key, widget, icon, tab))
                 self._requ.release()
                 if self._nthreads == 0:
                     self._terminate = False
@@ -981,11 +1005,17 @@ def gui():
                 wrk = self._done.pop()
                 self._mux.unlock()
 
-                key, wid = wrk[0], wrk[1]
+                key, wid, tab = wrk[0], wrk[1], wrk[3]
                 icon = self._cache[key]
                 icon.addFile(f'''{self._path}/{key.split('/')[-1]}''', size=QSize(128, 128))
                 # icon.Mode = QIcon.Normal
                 wid.setIcon(icon)
+                if False:
+                    # turn off for now
+                    px = QPixmap(f'''{self._path}/{key.split('/')[-1]}''')
+                    wid.setData(Qt.DecorationRole, px)
+                    # tab.resizeColumnToContents(0)
+                    pass
                 wid.update()
 
                 self._mux.lock()
@@ -1039,23 +1069,42 @@ def gui():
             icache.update()
             pass
 
+        # def cellActivated(self, row, col):
+        #    print(f'cell active: {row} {col}')
+
+        def itemClicked(self, item):
+            print(f'clicked: {item}')
+            pass
         pass
 
+
     tab = MyTable(len(usr.wers), 5)
-    tab.setItemDelegate(ZwiDelegate())
+    
+#delegate = ResizeDelegate(table, 0)
+#table.setItemDelegate(delegate)
+#table.resizeColumnsToContents()
+
+    tab.setItemDelegate(ZwiDelegate(tab))
     tab.setEditTriggers(
         QAbstractItemView.DoubleClicked | QAbstractItemView.SelectedClicked)
-    tab.setSelectionBehavior(QAbstractItemView.SelectRows)
+    tab.setSelectionBehavior(QAbstractItemView.SelectItems)
 
     headerLabels = ("", "First Name", "Last Name", "FollowerStatus", "FolloweeStatus")
     tab.setHorizontalHeaderLabels(headerLabels)
 
     icache = ImageCache(tab.sig)
+    fg = QBrush(QColor('yellow'))
+    bg = QBrush(QColor('black'))
+    font = QFont()
+    font.setPointSize(16)
 
     class MugShot(QTableWidgetItem):
         def __init__(self, tab, *args, **kwargs):
             super(MugShot, self).__init__(*args, **kwargs)
             self._tab = tab
+            self.setForeground(fg)
+            self.setBackground(bg)
+            self.setFont(font)
 
         def update(self):
             self._tab.update()
@@ -1076,25 +1125,50 @@ def gui():
 
         pass
 
+    class RowCol(QTableWidgetItem):
+        def __init__(self, *args, **kwargs):
+            super(RowCol, self).__init__(*args, **kwargs)
+            self.setForeground(fg)
+            self.setBackground(bg)
+            self.setFont(font)
+            pass
+        
+        def clone(self):
+            c = RowCol()
+            return c
+
+        def keyPressEvent(self, event):
+            key = event.key()
+            print(f'keyPress: {event=} {key=}')
+
+            if key == Qt.Key_Return or key == Qt.Key_Enter:
+                print('clicked enter')
+                pass
+            pass
+
+        pass
+
+
     row = 0
     for r in usr.wers:
         d = dict(zip(usr.cols, r))
 
         item0 = MugShot(tab)
-        icon = icache.load(d['imageSrc'], item0)
+        icon = icache.load(d['imageSrc'], item0, tab)
         item0.setIcon(icon)
         item0.setSizeHint(QSize(128, 128))
 
-        item1 = QTableWidgetItem(d['firstName'])
-        item2 = QTableWidgetItem(d['lastName'])
-        item3 = QTableWidgetItem(d['followerStatusOfLoggedInPlayer'])
-        item4 = QTableWidgetItem(d['followeeStatusOfLoggedInPlayer'])
+        item1 = RowCol(d['firstName'])
+        item2 = RowCol(d['lastName'])
+        item3 = RowCol(d['followerStatusOfLoggedInPlayer'])
+        item4 = RowCol(d['followeeStatusOfLoggedInPlayer'])
 
         tab.setItem(row, 0, item0)
         tab.setItem(row, 1, item1)
         tab.setItem(row, 2, item2)
         tab.setItem(row, 3, item3)
         tab.setItem(row, 4, item4)
+        tab.setRowHeight(row, 256)
         row += 1
         pass
 
