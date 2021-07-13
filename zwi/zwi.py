@@ -12,7 +12,9 @@
 
 import sys
 import os
+import time
 import sqlite3 as sq
+import threading
 from datetime import datetime
 from dataclasses import dataclass, asdict, astuple, fields
 
@@ -197,84 +199,58 @@ def zwi_init():
 
 def followees():
     count = 0
-    """
-    while True:
-        fe = pr.request.json('/api/profiles/{}/followees?start={}&limit=200'.format(pr.player_id, start))
-        if len(fe) == 0:
-            break
-        
-        for f in fe:
-            count += 1
-            fep = f['followeeProfile']
-            soc = fep['socialFacts']
-            boo = (f.wers_followeeStatusOfLoggedInPlayer'] != f.wers_followerStatusOfLoggedInPlayer'])
-
-            if verbose > 0:
-                # dump out entire list
-                print('{:4d}{}{} {}\t{} {}'.format(count, [' ', '*'][boo]
-                                                   , f.wers_followeeStatusOfLoggedInPlayer']
-                                                   , f.wers_followerStatusOfLoggedInPlayer']
-                                                   , fep['firstName'], fep['lastName']))
-            elif boo:
-                # disply only those whos soc status match
-                print('{:4d} {} {}\t{} {}'.format(count
-                                                  , f.wers_followeeStatusOfLoggedInPlayer']
-                                                  , f.wers_followerStatusOfLoggedInPlayer']
-                                                  , fep['firstName'], fep['lastName']))
-                pass
-            pass
-        start += 200
-        pass
-    print('processed {} followees'.format(count))
-    """
-    pass
-
-
-def followers():
-    """disabled"""
-    """
-    count = 0
-    wers = [Followers(a) for a in Followers.db_extract(raw=True)()]
-    fnfmt = Followers.tab._cfmt['wer_firstName']
-    lnfmt = Followers.tab._cfmt['wer_lastName']
-    nafmt = fnfmt + ' ' + lnfmt
-    fmt0 = '{:4d}{}'
-    fmt0 += Followers.tab._cfmt['wers_followeeStatusOfLoggedInPlayer']
-    fmt0 += Followers.tab._cfmt['wers_followerStatusOfLoggedInPlayer']
-    fmt0 += '\t' + nafmt
-    fmt1 = '{:4d} '
-    fmt1 += Followers.tab._cfmt['wers_followeeStatusOfLoggedInPlayer']
-    fmt1 += Followers.tab._cfmt['wers_followerStatusOfLoggedInPlayer']
-    fmt1 += '\t' + nafmt
-
-    for f in wers:
+    usr = ZwiUser()
+    for r in usr._wers:
+        d = dict(zip(usr._cols, r))
         count += 1
-        boo = (f.wers_followeeStatusOfLoggedInPlayer != f.wers_followerStatusOfLoggedInPlayer)
+        boo = (d['followeeStatusOfLoggedInPlayer'] != d['followerStatusOfLoggedInPlayer'])
 
         if verbosity > 0:
             # dump out entire list
-            print(fmt0.format(count, [' ', '*'][boo]
-                              , f.wers_followeeStatusOfLoggedInPlayer
-                              , f.wers_followerStatusOfLoggedInPlayer
-                              , f.wer_firstName, f.wer_lastName))
+            print('{:4d}{}{} {}\t{} {}'.format(count, [' ', '*'][boo]
+                                               , d['followeeStatusOfLoggedInPlayer']
+                                               , d['followerStatusOfLoggedInPlayer']
+                                               , d['firstName'], d['lastName']))
         elif boo:
             # disply only those whos soc status match
-            print(fmt1.format(count
-                              , f.wers_followeeStatusOfLoggedInPlayer
-                              , f.wers_followerStatusOfLoggedInPlayer
-                              , f.wer_firstName, f.wer_lastName))
+            print('{:4d} {} {}\t{} {}'.format(count
+                                              , d['followeeStatusOfLoggedInPlayer']
+                                              , d['followerStatusOfLoggedInPlayer']
+                                              , d['firstName'], d['lastName']))
+            pass
+        pass
+    print('processed {} followees'.format(count))
+    pass
+
+def followers():
+    count = 0
+    usr = ZwiUser()
+    for r in usr._wers:
+        d = dict(zip(usr._cols, r))
+        count += 1
+        boo = (d['followeeStatusOfLoggedInPlayer'] != d['followerStatusOfLoggedInPlayer'])
+
+        if verbosity > 0:
+            print('{:4d}{}{} {}\t{} {}'.format(count, [' ', '*'][boo]
+                                               , d['followeeStatusOfLoggedInPlayer']
+                                               , d['followerStatusOfLoggedInPlayer']
+                                               , d['firstName'], d['lastName']))
+        elif boo:
+            # disply only those whos soc status match
+            print('{:4d} {} {}\t{} {}'.format(count
+                                              , d['followeeStatusOfLoggedInPlayer']
+                                              , d['followerStatusOfLoggedInPlayer']
+                                              , d['firstName'], d['lastName']))
             pass
         pass
     print('processed {} followers'.format(count))
-    """
     pass
-
 
 @click.option('--wers', is_flag=True)
 @click.option('--wees', is_flag=True)
 @cli.command()
 def csv(wers, wees):
-    """Generate CVS output, full table.  Writes to stdout."""
+    """Generate CSV output, full table.  Writes to stdout."""
     import csv
 
     usr = ZwiUser()
@@ -422,6 +398,14 @@ class DataBase(EnumCache):
         if path is None:
             zdir = os.getenv('HOME') + '/.zwi/'
             path = zdir + 'zwi.db'
+            if not os.path.isdir(zdir):
+                try:
+                    os.mkdir(zdir)
+                except Exception as e:
+                    print(f'Cannot create database directory: {zdir}')
+                    print(f'{e}')
+                    raise SystemExit(f'Cannot create {zdir}')
+                pass
             pass
         return path
 
@@ -775,11 +759,21 @@ class ZwiFollowers(ZwiBase):
         return self.traverse(fun, list())
     pass
 
+def get_zdir(xtra=''):
+    """Establish local Zwi directory."""
 
-__wers = {'id': 0, 'followerId': 4005239, 'followeeId': 1277086, 'status': 'IS_FOLLOWING', 'isFolloweeFavoriteOfFollower': False, 'followerProfile': {'id': 4005239, 'publicId': 'b1aaff40-2f9b-4524-9fe9-1cd4df557cd2', 'firstName': 'W', 'lastName': 'Watopian in Review', 'male': False, 'imageSrc': None, 'imageSrcLarge': None, 'playerType': 'NORMAL', 'countryAlpha3': 'twn', 'countryCode': 158, 'useMetric': True, 'riding': False, 'privacy': {'approvalRequired': False, 'displayWeight': False, 'minor': False, 'privateMessaging': False, 'defaultFitnessDataPrivacy': False, 'suppressFollowerNotification': False, 'displayAge': False, 'defaultActivityPrivacy': 'PUBLIC'}, 'socialFacts': {'profileId': 4005239, 'followersCount': 1249, 'followeesCount': 2759, 'followeesInCommonWithLoggedInPlayer': 43, 'followerStatusOfLoggedInPlayer': 'IS_FOLLOWING', 'followeeStatusOfLoggedInPlayer': 'IS_FOLLOWING', 'isFavoriteOfLoggedInPlayer': True}, 'worldId': None, 'enrolledZwiftAcademy': False, 'playerTypeId': 1, 'playerSubTypeId': None, 'currentActivityId': None, 'likelyInGame': False}, 'followeeProfile': None}
+    zdir = os.getenv('HOME') + '/.zwi/' + xtra
+    if not os.path.isdir(zdir):
+        try:
+            os.mkdir(zdir)
+        except Exception as e:
+            print(f'Cannot create zwi directory: {zdir}')
+            print(f'{e}')
+            raise SystemExit(f'Cannot create {zdir}')
+        pass
+    return zdir
 
-__wees = {'id': 0, 'followerId': 1277086, 'followeeId': 4005239, 'status': 'IS_FOLLOWING', 'isFolloweeFavoriteOfFollower': True, 'followerProfile': None, 'followeeProfile': {'id': 4005239, 'publicId': 'b1aaff40-2f9b-4524-9fe9-1cd4df557cd2', 'firstName': 'W', 'lastName': 'Watopian in Review', 'male': False, 'imageSrc': None, 'imageSrcLarge': None, 'playerType': 'NORMAL', 'countryAlpha3': 'twn', 'countryCode': 158, 'useMetric': True, 'riding': False, 'privacy': {'approvalRequired': False, 'displayWeight': False, 'minor': False, 'privateMessaging': False, 'defaultFitnessDataPrivacy': False, 'suppressFollowerNotification': False, 'displayAge': False, 'defaultActivityPrivacy': 'PUBLIC'}, 'socialFacts': {'profileId': 4005239, 'followersCount': 1248, 'followeesCount': 2758, 'followeesInCommonWithLoggedInPlayer': 43, 'followerStatusOfLoggedInPlayer': 'IS_FOLLOWING', 'followeeStatusOfLoggedInPlayer': 'IS_FOLLOWING', 'isFavoriteOfLoggedInPlayer': True}, 'worldId': None, 'enrolledZwiftAcademy': False, 'playerTypeId': 1, 'playerSubTypeId': None, 'currentActivityId': None, 'likelyInGame': False}}
-
+    
 class ZwiUser(object):
     """Zwift user model."""
     def __init__(self, db=None, drop=False, update=False):
@@ -787,7 +781,6 @@ class ZwiUser(object):
         self._wers = []
         self._wees = []
         self._cols = ZwiFollowers.column_names()
-        # self._cl, self._pr = zwi_init()
         self._cl = None
         self._pr = None
         self._setup(drop, update)
@@ -834,6 +827,10 @@ class ZwiUser(object):
         pass
 
     def update(self, tab, factory):
+        if self._pr is None:
+            self._cl, self._pr = zwi_init()
+            pass
+
         vec = []
         start = 0
         while True:
@@ -877,7 +874,316 @@ class ZwiUser(object):
     
     pass
 
+@cli.command()
+def gui():
+    """Play with Qt to see if can use...."""
+    try:
+        import PyQt5
+        from PyQt5.QtWidgets import QApplication, QWidget, QPushButton, QVBoxLayout, QTableWidget
+        from PyQt5.QtCore import pyqtSignal, QPointF, QRect, QSize, Qt, QRunnable, QThreadPool, QMutex, QSemaphore
+        from PyQt5.QtGui import QPainter, QPolygonF, QIcon, QPixmap, QBrush, QPen, QColor
+        from PyQt5.QtWidgets import (QAbstractItemView, QApplication, QStyle,
+                                     QStyledItemDelegate, QTableWidget, QTableWidgetItem, QWidget)
+        import shutil
+        import urllib.request
+        import ssl
+    except Exception as e:
+        print('import error', e)
+        print('pip3 install pyqt5')
+        sys.exit(1)
+        pass
+
+
+    class ZwiView(QWidget):
+        editingFinished = pyqtSignal()
+
+        def __init__(self, parent = None):
+            super(ZwiView, self).__init__(parent)
+
+            self.setMouseTracking(True)
+            self.setAutoFillBackground(True)
+            pass
+
+        def sizeHint(self):
+            a = QWidget.sizeHint(self)
+            a.setHeight(a.height() + 75)
+            a.setWidth(a.width() + 100)
+            print(f'sizeHint: {a.height()=}, {a.width()=}')
+            return a
+
+        def paintEvent(self, event):
+            painter = QPainter(self)
+            # print(f'paintEvent {event=}')
+            return
+
+        def mouseMoveEvent(self, event):
+            print(f'mouseMove {event=}')
+            return
+
+        def mouseReleaseEvent(self, event):
+            print(f'mouseRelease {event=}')
+            self.editingFinished.emit()
+            return
+        pass
+
+    class ZwiDelegate(QStyledItemDelegate):
+        def paint(self, painter, option, index):
+            # print(f'paint {option=} {index=} {index.row()=} {index.column()=}')
+            if index.column() == 0:
+                x,y,w,h = option.rect.x(), option.rect.y(), option.rect.width(), option.rect.height()
+                # print(f'option: {x},{y} {w},{h}')
+                self.initStyleOption(option, index)
+                super(ZwiDelegate, self).paint(painter, option, index)
+                painter.save()
+                pen = QPen(QColor("black"))
+                qr = QRect(option.rect)
+                qr.setWidth(pen.width())
+                painter.setPen(pen)
+                painter.drawRect(qr)
+                painter.restore()
+            else:
+                super(ZwiDelegate, self).paint(painter, option, index)
+            return
+
+        def sizeHint(self, option, index):
+            # print(f'sizeHint: {option=} {index=} {index.row()=} {index.column()=}')
+            if index.column() == 0:
+                return QSize(256, 256)
+            return super(ZwiDelegate, self).sizeHint(option, index)
+
+        def createEditor(self, parent, option, index):
+            """Do not create editor: all are read-only."""
+            return None	
+
+        def setEditorData(self, editor, index):
+            print(f'setEditorData: {self=} {editor=} {index=}')
+            super(ZwiDelegate, self).setEditorData(editor, index)
+            return
+
+        def setModelData(self, editor, model, index):
+            print(f'setModeData: {self=} {editor=} {index=}')
+            super(ZwiDelegate, self).setModelData(editor, model, index)
+            return
+
+        def commitAndCloseEditor(self):
+            editor = self.sender()
+            self.commitData.emit(editor)
+            self.closeEditor.emit(editor)
+            return
+        pass
+
+    # logging.basicConfig(format="%(message)s", level=logging.INFO)
+
+
+    class ImageCache(QRunnable):
+        def __init__(self, sig):
+            super().__init__()
+            self._queue = []
+            self._done = []
+            self._cache = {}
+            self._context = self._ssl_kluge()
+            self._threads = list()
+            self._path =  get_zdir('.image-cache')
+            self._mux  = QMutex()
+            self._requ = QSemaphore()
+            self._resp = QSemaphore()
+            self._pool = QThreadPool.globalInstance()
+            self._sig = sig
+            self._terminate = False
+            self._nthreads = 0
+            pass
+
+        def load(self, key, widget):
+            """Load an image into the cache."""
+            self._mux.lock()
+            if key in self._cache:
+                icon = self._cache[key]
+            else:
+                icon = QIcon()
+                self._cache[key] = icon
+
+                self._queue.insert(0, (key, widget, icon))
+                self._requ.release()
+                if self._nthreads == 0:
+                    self._terminate = False
+                    self._pool.start(self)
+                    self._nthreads = 1
+                    pass
+                pass
+            self._mux.unlock()
+            return icon
+
+        def run(self):
+            """Thread function."""
+            # print(f'running: {self=}')
+            while True:
+                self._requ.acquire()
+                self._mux.lock()
+                if self._terminate:
+                    # print(f'{self=} {self._terminate=} {self._nthreads=}')
+                    self._terminate = False
+                    self._nthreads = 0
+                    assert len(self._queue) == 0
+                    self._mux.unlock()
+                    return
+
+                wrk = self._queue.pop()
+                self._mux.unlock()
+
+                key = wrk[0]
+                if key == 'None' or not 'http' in key:
+                    continue	# some are None???
+
+                path = f'''{self._path}/{key.split('/')[-1]}'''
+                if not os.path.isfile(path):
+                    self._fetch(key)
+                    pass
+
+                if os.path.isfile(path):
+                    self._mux.lock()
+                    self._done.insert(0, wrk)
+                    self._mux.unlock()
+                    self._sig.emit(1)
+                    pass
+                time.sleep(.001)
+                pass
+            pass
+
+        def _ssl_kluge(self):
+            """Need this to avoid certificate validation errors."""
+            context = ssl.create_default_context()
+            context.check_hostname = False
+            context.verify_mode = ssl.CERT_NONE
+            return context
+
+        def update(self):
+            self._mux.lock()
+            while len(self._done) > 0:
+                wrk = self._done.pop()
+                self._mux.unlock()
+
+                key, wid = wrk[0], wrk[1]
+                icon = self._cache[key]
+                icon.addFile(f'''{self._path}/{key.split('/')[-1]}''', size=QSize(128,128))
+                # icon.Mode = QIcon.Normal
+                wid.setIcon(icon)
+                wid.update()
+
+                self._mux.lock()
+                pass
+
+            # see if we are all done
+            if len(self._queue) == 0 and not self._terminate and self._nthreads > 0:
+                # print(f'request thread to terminate')
+                self._terminate = True
+                self._requ.release()
+                pass
+            self._mux.unlock()
+            pass
+
+        def _fetch(self, url, path):
+            """Try to fetch the resource and stack in file."""
+            try:
+                with urllib.request.urlopen(url, context=self._context) as resp:
+                    f = open(path, 'wb')
+                    shutil.copyfileobj(resp, f)
+                    f.close()
+            except Exception as e:
+                print(f'oops: {e}')
+                self._mux.lock()
+                del self._cache[key]
+                try:
+                    os.remove(path)
+                except Exception as e:
+                    pass
+                self._mux.unlock()
+                pass
+            pass
+        pass
+    pass
+
+    app = QApplication([])
+    usr = ZwiUser()
+
+    class MyTable(QTableWidget):
+        sig = pyqtSignal(int, name='results')
+
+        def __init__(self, r, c, parent = None):
+            super(MyTable, self).__init__(r, c, parent)
+            self.sig.connect(self.handle)
+            self.setIconSize(QSize(256,256))
+            pass
+
+        def handle(self, index):
+            icache.update()
+            pass
+        pass
+
+    tab = MyTable(len(usr._wers), 5)
+    tab.setItemDelegate(ZwiDelegate())
+    tab.setEditTriggers(
+        QAbstractItemView.DoubleClicked | QAbstractItemView.SelectedClicked)
+    tab.setSelectionBehavior(QAbstractItemView.SelectRows)
+
+    headerLabels = ("", "First Name", "Last Name", "FollowerStatus", "FolloweeStatus")
+    tab.setHorizontalHeaderLabels(headerLabels)
+
+    icache = ImageCache(tab.sig)
+
+    class MugShot(QTableWidgetItem):
+        def __init__(self, tab, *args, **kwargs):
+            super(MugShot, self).__init__(*args, **kwargs)
+            self._tab = tab
+
+        def update(self):
+            self._tab.update()
+            pass
+        
+        def clone(self):
+            c = MugShot(self._tab)
+            return c
+
+        def keyPressEvent(self, event):
+            key = event.key()
+            print(f'keyPress: {event=} {key=}')
+
+            if key == Qt.Key_Return or key == Qt.Key_Enter:
+                print('clicked enter')
+                pass
+            pass
+        pass
     
+    row = 0
+    for r in usr._wers:
+        d = dict(zip(usr._cols, r))
+        
+
+        item0 = MugShot(tab)
+        icon = icache.load(d['imageSrc'], item0)
+        item0.setIcon(icon)
+        item0.setSizeHint(QSize(128, 128))
+
+        item1 = QTableWidgetItem(d['firstName'])
+        item2 = QTableWidgetItem(d['lastName'])
+        item3 = QTableWidgetItem(d['followerStatusOfLoggedInPlayer'])
+        item4 = QTableWidgetItem(d['followeeStatusOfLoggedInPlayer'])
+
+        tab.setItem(row, 0, item0)
+        tab.setItem(row, 1, item1)
+        tab.setItem(row, 2, item2)
+        tab.setItem(row, 3, item3)
+        tab.setItem(row, 4, item4)
+        row += 1
+        pass
+
+    tab.resizeColumnsToContents()
+    tab.resize(1024, 1024)
+    tab.show()
+
+    QApplication.processEvents()
+    sys.exit(app.exec_())
+    pass
+
 
 @cli.command()
 def devel():
@@ -1007,80 +1313,6 @@ def reset():
     usr = ZwiUser(db, update=True)
 
     return 0
-
-
-@cli.command()
-def gui():
-    """Pop up a GUI window, displaying results from the DB."""
-
-    return _gui(db=None)
-
-
-def _gui(db=None):
-    import tkinter as tk
-    from tkinter.constants import RIGHT, BOTH, LEFT, END
-    from tkinter.scrolledtext import ScrolledText
-    from tkinter.font import Font
-
-    class GuiApp(tk.Frame):
-        def __init__(self, db, master=None):
-            self._buttons = {}
-            self._fonts = {}
-            self._db = db
-            super().__init__(master)
-            self.master = master
-            self.pack()
-            self.create_widgets()
-            self.refresh()
-            pass
-
-        def create_widgets(self):
-            self._fonts['courier'] = Font(family='Courier', size=16)
-            self._buttons['quit'] = tk.Button(self, text='quit', fg='red', command=self.master.destroy)
-            self._buttons['quit'].pack(side='top')
-            self._buttons['refresh'] = tk.Button(self, text='refresh', command=self.refresh)
-            self._buttons['refresh'].pack(side='top')
-
-            self._box = ScrolledText(bg='black', fg='green'
-                                     , height=32, width=128, font=self._fonts['courier'])
-            self._box.insert(END, 'hit refresh')
-            self._box.configure(state='disabled')
-            self._box.pack(fill=BOTH, side=LEFT, expand=True)
-            self._box.focus_set()
-            pass
-
-        def refresh(self):
-            b = self._box
-
-            """
-            rows = Followers_v1.db_extract(self._db, ['followerId', 'wer_firstName', 'wer_lastName'
-                , 'wer_playerType'
-                , 'isFolloweeFavoriteOfFollower'])
-
-            b.configure(state='normal')
-            b.delete('1.0', END)
-
-            for r in rows():
-                b.insert(END, r + '\n')
-                pass
-            """
-            b.configure(state='disabled')
-            b.pack(fill=BOTH, side=LEFT, expand=True)
-            b.focus_set()
-            pass
-
-        def quit(self):
-            sys.exit(0)
-            pass
-
-        pass
-
-    if not db:
-        db = DataBase.db_connect()
-
-    app = GuiApp(db, master=tk.Tk())
-    app.mainloop()
-    pass
 
 
 if __name__ == '__main__':
