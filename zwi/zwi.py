@@ -472,7 +472,7 @@ class DataBase(EnumCache):
         return False
 
     def execute(self, exe):
-        verbo(1, f'{exe}')
+        debug(2, f'{exe}')
         try:
             return self.cursor.execute(exe)
         except Exception as e:
@@ -490,8 +490,8 @@ class DataBase(EnumCache):
         return
 
     def row_insert(self, name, cols, vals):
-        verbo(1, f'{cols=}')
-        verbo(1, f'{vals=}')
+        debug(2, f'{cols=}')
+        debug(2, f'{vals=}')
         exe = f'''INSERT INTO {name} ({', '.join(cols)}) VALUES({', '.join(vals)});'''
         self.execute(exe)
         self.commit()
@@ -802,8 +802,8 @@ class ZwiUser(object):
         self._db.create_table('followees', ZwiFollowers.column_names(create=True, pk='followeeId'))
 
         if update:  # update from Zwift?
-            usr.update('followers', usr.wers_fac)
-            usr.update('followees', usr.wees_fac)
+            self.update('followers', self.wers_fac)
+            self.update('followees', self.wees_fac)
             pass
 
         self._slurp(self._wers, 'followers')
@@ -818,7 +818,7 @@ class ZwiUser(object):
             cache.append(r)
             count = count + 1
             if count <= 10 and verbosity >= 2:
-                verbo(2, f'{r=}')
+                verbo(3, f'{r=}')
             elif verbosity >= 1:
                 print(f'\rslurped {tab}: {count}', end='')
                 pass
@@ -834,7 +834,7 @@ class ZwiUser(object):
         vec = []
         start = 0
         while True:
-            fe = self._pr.request.json(f'/api/profiles/{self._pr.player_id}/{tab}?start={start}&limit=50')
+            fe = self._pr.request.json(f'/api/profiles/{self._pr.player_id}/{tab}?start={start}&limit=200')
             if len(fe) == 0:
                 break
 
@@ -857,7 +857,9 @@ class ZwiUser(object):
             w = factory(v)
             self._db.row_insert(tab, w.column_names(), w.column_values())
             start += 1
-            verbo(1, f'\rprocessed {tab}: {start}', end='')
+            if verbosity >= 1:
+                print(f'\rprocessed {tab}: {start}', end='')
+                pass
             pass
         verbo(1, '')
         return
