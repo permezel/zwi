@@ -14,7 +14,6 @@ import sys
 import os
 import time
 import sqlite3 as sq
-import threading
 from datetime import datetime
 from dataclasses import dataclass, asdict, astuple, fields
 
@@ -133,8 +132,6 @@ def check():
 def clear():
     """Clear out any saved authentication information."""
 
-    name = None
-
     try:
         name = keyring.get_password('zwi.py', 'username')
     except keyring.errors.KeyringError as e:
@@ -200,8 +197,8 @@ def zwi_init():
 def followees():
     count = 0
     usr = ZwiUser()
-    for r in usr._wers:
-        d = dict(zip(usr._cols, r))
+    for r in usr.wers:
+        d = dict(zip(usr.cols, r))
         count += 1
         boo = (d['followeeStatusOfLoggedInPlayer'] != d['followerStatusOfLoggedInPlayer'])
 
@@ -212,7 +209,7 @@ def followees():
                                                , d['followerStatusOfLoggedInPlayer']
                                                , d['firstName'], d['lastName']))
         elif boo:
-            # disply only those whos soc status match
+            # display only those whose soc status match
             print('{:4d} {} {}\t{} {}'.format(count
                                               , d['followeeStatusOfLoggedInPlayer']
                                               , d['followerStatusOfLoggedInPlayer']
@@ -222,11 +219,12 @@ def followees():
     print('processed {} followees'.format(count))
     pass
 
+
 def followers():
     count = 0
     usr = ZwiUser()
-    for r in usr._wers:
-        d = dict(zip(usr._cols, r))
+    for r in usr.wers:
+        d = dict(zip(usr.cols, r))
         count += 1
         boo = (d['followeeStatusOfLoggedInPlayer'] != d['followerStatusOfLoggedInPlayer'])
 
@@ -236,7 +234,7 @@ def followers():
                                                , d['followerStatusOfLoggedInPlayer']
                                                , d['firstName'], d['lastName']))
         elif boo:
-            # disply only those whos soc status match
+            # display only those whose soc status match
             print('{:4d} {} {}\t{} {}'.format(count
                                               , d['followeeStatusOfLoggedInPlayer']
                                               , d['followerStatusOfLoggedInPlayer']
@@ -245,6 +243,7 @@ def followers():
         pass
     print('processed {} followers'.format(count))
     pass
+
 
 @click.option('--wers', is_flag=True)
 @click.option('--wees', is_flag=True)
@@ -256,114 +255,25 @@ def csv(wers, wees):
     usr = ZwiUser()
 
     if wers:
-        rows = usr._wers
+        rows = usr.wers
     elif wees:
-        rows = usr._wees
+        rows = usr.wees
     else:
         raise SystemExit('No table selected.')
         pass
-    
+
     with sys.stdout as out:
-        writer = csv.DictWriter(out, fieldnames=usr._cols)
+        writer = csv.DictWriter(out, fieldnames=usr.cols)
         writer.writeheader()
         for r in rows:
-            d = dict(zip(usr._cols, r))
+            d = dict(zip(usr.cols, r))
             writer.writerow(d)
             pass
         pass
     pass
 
 
-class EnumCache(object):
-    """Currently not using the enum cache."""
-    def __init__(self, db, name='enum'):
-        super().__init__()
-        self._db = db
-        self._name = name
-        self._enumv = {}  # _enum['class']['name'] = val
-        self._enums = {}  # _enum['class'][val] = 'name'
-        self._setup()
-        pass
-
-    def enum_set(self, c, k, v):
-        """map value thru enum cache."""
-        if not c in self._enumv:
-            self._enumv[c] = {}
-            self._enums[c] = {}
-            pass
-
-        if k in self._enumv[c]:
-            assert self._enumv[c][k] == v
-            assert self._enums[c][v] == k
-        else:
-            self._db.execute(f'''INSERT INTO {self._name} VALUES('{c}', '{k}', {v});''')
-            self._db.commit()
-            self._enumv[c][k] = v
-            self._enums[c][v] = k
-            pass
-        return v
-
-    def enum_get(self, c, k):
-        """If `c[k]` is not currently in the cache, we add it."""
-        if not c in self._enumv:
-            self._enumv[c] = {}
-            self._enums[c] = {}
-            pass
-        if not k in self._enumv[c]:
-            return self.enum_set(c, k, len(self._enumv[c]))
-        return self._enumv[c][k]
-
-    def enum_str(self, c, v):
-        return self._enums[c][v]
-
-    def _setup(self):
-        """Establish table in DB if required.  Cache any extant values."""
-        self.gen_tables()
-        self.sync_cache()
-        pass
-
-    def table_exists(self):
-        debug(2, f'enum_table_exists({self=}, {self._name=}, {self._db=})')
-        return self._db.table_exists(self._name)
-
-    def gen_tables(self, drop=False):
-        """Generate the ENUM table."""
-        debug(2, f'gen_table({self=}, {self._name=}, {self._db=}, {drop=})')
-
-        if drop:
-            self._db.drop_tables()
-            pass
-        self._db.execute(
-            f'''CREATE TABLE IF NOT EXISTS {self._name} (cat INT, name TEXT, val INT, UNIQUE(cat, name), PRIMARY KEY(cat, val)) WITHOUT ROWID;''')
-        self._db.commit()
-        pass
-
-    def sync_cache(self):
-        try:
-            res = self._db.execute(f'''SELECT * FROM {self._name};''')
-        except Exception as e:
-            print(f'{e=}')
-            res = []
-            pass
-
-        for r in res:
-            debug(2, f'{res=}')
-            (c, k, v) = r
-            if c in self._enumv and k in self._enumv[c]:
-                assert self._enumv[c][k] == v
-            else:
-                if c not in self._enumv:
-                    self._enumv[c] = {}
-                    pass
-                self._enumv[c][k] = v
-                pass
-            pass
-        return
-
-    pass
-
-
-class DataBase(EnumCache):
+class DataBase(object):
     cache = {}  # DB universe
 
     def __init__(self, path=None, reset=False):
@@ -380,8 +290,7 @@ class DataBase(EnumCache):
             pass
 
         self._db = DataBase.__db_connect(path, reset)
-        self.execute('PRAGMA foreign_keys=ON;')
-        super().__init__(self._db)
+        super().__init__()
 
         DataBase.cache[path] = self
         pass
@@ -515,7 +424,7 @@ class DataBase(EnumCache):
             pass
 
         return gen
-        
+
     def commit(self):
         return self.db.commit()
 
@@ -560,10 +469,10 @@ class ZwiBase(object):
                     debug(2, f'dict: {f0=} {arg[x.name]=}')
                     f0.traverse(ZwiBase.from_dict, arg[x.name])
                 else:
-                    raise SysException(f'oops')
+                    raise SystemExit(f'oops')
                 pass
             else:
-                raise SysException(f'Unexpected type: {x.type=}')
+                raise SystemExit(f'Unexpected type: {x.type=}')
             pass
         return arg
 
@@ -586,10 +495,11 @@ class ZwiBase(object):
                     pass
                 pass
             else:
-                raise SysException(f'Unexpected type: {x.type=}')
+                raise SystemExit(f'Unexpected type: {x.type=}')
             pass
         return arg
 
+    @staticmethod
     def from_seq(f, x, arg):
         """Assign values from a sequence.
         We perform a depth-first traversal, and pop successive values from the sequence."""
@@ -605,78 +515,73 @@ class ZwiBase(object):
             if f0 is not None:
                 f0.traverse(f0.from_seq, arg)
                 pass
-            raise SysException('logic error')
+            raise SystemExit('logic error')
         else:
-            raise SysException(f'Unexpected type: {x.type=}')
+            raise SystemExit(f'Unexpected type: {x.type=}')
         return arg
-    
+
     pass
 
 
 @dataclass
 class ZwiFollowers(ZwiBase):
-    # id:					int = 0
-    followerId:				int = 0
-    followeeId:				int = 0
-    status:				str = ''
-    isFolloweeFavoriteOfFollower:	bool = False
+    followerId: int = 0
+    followeeId: int = 0
+    status: str = ''
+    isFolloweeFavoriteOfFollower: bool = False
 
     @dataclass
     class FollowerProfile(ZwiBase):
-        # id:			int = 0
-        publicId:		str = ''
-        firstName:		str = ''
-        lastName:		str = ''
-        male:			bool = True
-        imageSrc:		str = ''
-        imageSrcLarge:		str = ''
-        playerType:		str = ''
-        countryAlpha3:		str = ''
-        countryCode:		int = 0
-        useMetric:		bool = True
-        riding:			bool = False
+        publicId: str = ''
+        firstName: str = ''
+        lastName: str = ''
+        male: bool = True
+        imageSrc: str = ''
+        imageSrcLarge: str = ''
+        playerType: str = ''
+        countryAlpha3: str = ''
+        countryCode: int = 0
+        useMetric: bool = True
+        riding: bool = False
 
         @dataclass
         class Privacy(ZwiBase):
-            approvalRequired:			bool = False
-            displayWeight:			bool = False
-            minor:				bool = False
-            privateMessaging:			bool = False
-            defaultFitnessDataPrivacy:		bool = False
-            suppressFollowerNotification:	bool = False
-            displayAge:				bool = True
-            defaultActivityPrivacy:		str = ''
+            approvalRequired: bool = False
+            displayWeight: bool = False
+            minor: bool = False
+            privateMessaging: bool = False
+            defaultFitnessDataPrivacy: bool = False
+            suppressFollowerNotification: bool = False
+            displayAge: bool = True
+            defaultActivityPrivacy: str = ''
 
             pass
-
 
         privacy: Privacy = Privacy()
 
         @dataclass
         class SocialFacts(ZwiBase):
-            #profileId:				int = 0
-            followersCount:			int = 0
-            followeesCount:			int = 0
-            followeesInCommonWithLoggedInPlayer:int = 0
-            followerStatusOfLoggedInPlayer:	str = ''
-            followeeStatusOfLoggedInPlayer:	str = ''
-            isFavoriteOfLoggedInPlayer:		bool = True
+            followersCount: int = 0
+            followeesCount: int = 0
+            followeesInCommonWithLoggedInPlayer: int = 0
+            followerStatusOfLoggedInPlayer: str = ''
+            followeeStatusOfLoggedInPlayer: str = ''
+            isFavoriteOfLoggedInPlayer: bool = True
             pass
 
-
         socialFacts: SocialFacts = SocialFacts()
-        worldId:		int = 0
-        enrolledZwiftAcademy:	bool = False
-        playerTypeId:		int = 0
-        playerSubTypeId:	int = 0
-        currentActivityId:	int = 0
-        likelyInGame:		bool = False
+        worldId: int = 0
+        enrolledZwiftAcademy: bool = False
+        playerTypeId: int = 0
+        playerSubTypeId: int = 0
+        currentActivityId: int = 0
+        likelyInGame: bool = False
         pass
 
     profile: FollowerProfile = FollowerProfile()
 
-    addDate:			str = f'''{datetime.now().isoformat(timespec='minutes')}'''
-    delDate:			str = 'not yet'
+    addDate: str = f'''{datetime.now().isoformat(timespec='minutes')}'''
+    delDate: str = 'not yet'
 
     @classmethod
     def wers(cls, data):
@@ -690,7 +595,7 @@ class ZwiFollowers(ZwiBase):
             e.traverse(ZwiBase.from_dict, data)
             return e
         raise Exception(f'funny type of {data!r}')
-    
+
     @classmethod
     def wees(cls, data):
         """Init a followees-type entry."""
@@ -703,20 +608,20 @@ class ZwiFollowers(ZwiBase):
             e.traverse(ZwiBase.from_dict, data)
             return e
         raise Exception(f'funny type of {data!r}')
-    
+
     @classmethod
     def column_names(cls, pk='', create=False):
         """generate the columnt list for a DB create."""
         tmap = {int: 'INT', bool: 'INT', str: 'TEXT'}
-        
+
         def fun(f, x, arg):
             """Function to enumerate the column names."""
             if x.type in (int, bool, str):
-                if not create:			# INSERT/SELECT usage
-                    arg.append(f'{x.name}')	# .. no type
-                elif x.name == pk:		# CREATE and PRIMARY
+                if not create:  # INSERT/SELECT usage
+                    arg.append(f'{x.name}')  # .. no type
+                elif x.name == pk:  # CREATE and PRIMARY
                     arg.append(f'{x.name} {tmap[x.type]} PRIMARY KEY')
-                else:				# CREATE, no PRIMARY
+                else:  # CREATE, no PRIMARY
                     arg.append(f'{x.name} {tmap[x.type]}')
             elif isinstance(x.type(), ZwiBase):
                 f0 = getattr(f, x.name)
@@ -730,8 +635,6 @@ class ZwiFollowers(ZwiBase):
 
     def column_values(self):
         """generate the values list for a DB insert."""
-        tmap = {int: 'INT', bool: 'INT', str: 'TEXT'}
-        
         def fun(f, x, arg):
             """Function to enumerate the column values."""
             val = getattr(f, x.name)
@@ -754,10 +657,9 @@ class ZwiFollowers(ZwiBase):
                     pass
                 pass
             pass
-
-        print
         return self.traverse(fun, list())
     pass
+
 
 def get_zdir(xtra=''):
     """Establish local Zwi directory."""
@@ -773,9 +675,10 @@ def get_zdir(xtra=''):
         pass
     return zdir
 
-    
+
 class ZwiUser(object):
     """Zwift user model."""
+
     def __init__(self, db=None, drop=False, update=False):
         self._db = db
         self._wers = []
@@ -786,16 +689,28 @@ class ZwiUser(object):
         self._setup(drop, update)
         pass
 
+    @property
+    def cols(self):
+        return self._cols
+
+    @property
+    def wees(self):
+        return self._wees
+
+    @property
+    def wers(self):
+        return self._wers
+    
     def _setup(self, drop, update):
         """Syncronise with the local DB version of the world."""
-        if self._db is None:	# attach to the usual DB
+        if self._db is None:  # attach to the usual DB
             self._db = DataBase.db_connect()
             pass
 
         if drop:
-            db.drop_table('followers')
-            db.drop_table('followees')
-            db.drop_table('enum')	# XXX: not here
+            self._db.drop_table('followers')
+            self._db.drop_table('followees')
+            self._db.drop_table('enum')  # XXX: not here
             pass
 
         self._db.create_table('followers', ZwiFollowers.column_names(create=True, pk='followerId'))
@@ -868,13 +783,14 @@ class ZwiUser(object):
         o = ZwiFollowers.wers(v)
         self._wers.append(o)
         return o
-    
+
     def wees_fac(self, v):
         o = ZwiFollowers.wees(v)
         self._wees.append(o)
         return o
-    
+
     pass
+
 
 @cli.command()
 def gui():
@@ -895,11 +811,10 @@ def gui():
         sys.exit(1)
         pass
 
-
     class ZwiView(QWidget):
         editingFinished = pyqtSignal()
 
-        def __init__(self, parent = None):
+        def __init__(self, parent=None):
             super(ZwiView, self).__init__(parent)
 
             self.setMouseTracking(True)
@@ -926,13 +841,14 @@ def gui():
             print(f'mouseRelease {event=}')
             self.editingFinished.emit()
             return
+
         pass
 
     class ZwiDelegate(QStyledItemDelegate):
         def paint(self, painter, option, index):
             # print(f'paint {option=} {index=} {index.row()=} {index.column()=}')
             if index.column() == 0:
-                x,y,w,h = option.rect.x(), option.rect.y(), option.rect.width(), option.rect.height()
+                x, y, w, h = option.rect.x(), option.rect.y(), option.rect.width(), option.rect.height()
                 # print(f'option: {x},{y} {w},{h}')
                 self.initStyleOption(option, index)
                 super(ZwiDelegate, self).paint(painter, option, index)
@@ -955,7 +871,7 @@ def gui():
 
         def createEditor(self, parent, option, index):
             """Do not create editor: all are read-only."""
-            return None	
+            return None
 
         def setEditorData(self, editor, index):
             print(f'setEditorData: {self=} {editor=} {index=}')
@@ -972,10 +888,10 @@ def gui():
             self.commitData.emit(editor)
             self.closeEditor.emit(editor)
             return
+
         pass
 
     # logging.basicConfig(format="%(message)s", level=logging.INFO)
-
 
     class ImageCache(QRunnable):
         def __init__(self, sig):
@@ -985,8 +901,8 @@ def gui():
             self._cache = {}
             self._context = self._ssl_kluge()
             self._threads = list()
-            self._path =  get_zdir('.image-cache')
-            self._mux  = QMutex()
+            self._path = get_zdir('.image-cache')
+            self._mux = QMutex()
             self._requ = QSemaphore()
             self._resp = QSemaphore()
             self._pool = QThreadPool.globalInstance()
@@ -1033,8 +949,8 @@ def gui():
                 self._mux.unlock()
 
                 key = wrk[0]
-                if key == 'None' or not 'http' in key:
-                    continue	# some are None???
+                if key == 'None' or 'http' not in key:
+                    continue  # some are None???
 
                 path = f'''{self._path}/{key.split('/')[-1]}'''
                 if not os.path.isfile(path):
@@ -1051,7 +967,8 @@ def gui():
                 pass
             pass
 
-        def _ssl_kluge(self):
+        @staticmethod
+        def _ssl_kluge():
             """Need this to avoid certificate validation errors."""
             context = ssl.create_default_context()
             context.check_hostname = False
@@ -1066,7 +983,7 @@ def gui():
 
                 key, wid = wrk[0], wrk[1]
                 icon = self._cache[key]
-                icon.addFile(f'''{self._path}/{key.split('/')[-1]}''', size=QSize(128,128))
+                icon.addFile(f'''{self._path}/{key.split('/')[-1]}''', size=QSize(128, 128))
                 # icon.Mode = QIcon.Normal
                 wid.setIcon(icon)
                 wid.update()
@@ -1093,7 +1010,7 @@ def gui():
             except Exception as e:
                 print(f'oops: {e}')
                 self._mux.lock()
-                del self._cache[key]
+                del self._cache[url]
                 try:
                     os.remove(path)
                 except Exception as e:
@@ -1101,7 +1018,9 @@ def gui():
                 self._mux.unlock()
                 pass
             pass
+
         pass
+
     pass
 
     app = QApplication([])
@@ -1110,18 +1029,19 @@ def gui():
     class MyTable(QTableWidget):
         sig = pyqtSignal(int, name='results')
 
-        def __init__(self, r, c, parent = None):
+        def __init__(self, r, c, parent=None):
             super(MyTable, self).__init__(r, c, parent)
             self.sig.connect(self.handle)
-            self.setIconSize(QSize(256,256))
+            self.setIconSize(QSize(256, 256))
             pass
 
         def handle(self, index):
             icache.update()
             pass
+
         pass
 
-    tab = MyTable(len(usr._wers), 5)
+    tab = MyTable(len(usr.wers), 5)
     tab.setItemDelegate(ZwiDelegate())
     tab.setEditTriggers(
         QAbstractItemView.DoubleClicked | QAbstractItemView.SelectedClicked)
@@ -1140,7 +1060,7 @@ def gui():
         def update(self):
             self._tab.update()
             pass
-        
+
         def clone(self):
             c = MugShot(self._tab)
             return c
@@ -1153,12 +1073,12 @@ def gui():
                 print('clicked enter')
                 pass
             pass
+
         pass
-    
+
     row = 0
-    for r in usr._wers:
-        d = dict(zip(usr._cols, r))
-        
+    for r in usr.wers:
+        d = dict(zip(usr.cols, r))
 
         item0 = MugShot(tab)
         icon = icache.load(d['imageSrc'], item0)
@@ -1188,45 +1108,6 @@ def gui():
 
 
 @cli.command()
-def devel():
-    """Try out some devel options."""
-
-    db = DataBase.db_connect()
-    usr = ZwiUser(db, drop=False, update=False)
-
-    if True: return
-
-    #db1.table_exists('zwi')
-    #db1.create_table('zwi', f)
-    #db1.row_insert('zwi', f)
-
-    init = asdict(f)
-    
-    f.traverse(ZwiBase.from_dict, Followers.template)
-    db1.row_insert('zwi', f)
-
-    f.traverse(ZwiBase.from_dict, __wees)
-    db1.row_insert('zwi', f)
-
-    d = f.traverse(ZwiBase.to_dict, init)
-    print(f'{f=}')
-    print(f'{d=}')
-
-    def fun(f, x, arg):
-        if x.type in (int, bool, str):
-            arg.append(x.name)
-        elif isinstance(x.type(), ZwiBase):
-            f0 = eval(f'f.{x.name}')
-            if f0 is not None:
-                f0.traverse(fun, arg)
-                pass
-            pass
-        pass
-
-    cols = f.traverse(fun, [])
-    pass
-
-@cli.command()
 def test():
     """Perform some modicum of internal tests."""
 
@@ -1236,75 +1117,19 @@ def test():
         print(f'{e!r}: oops!')
         pass
 
-    f = ZwiFollowers()
-    f.traverse(ZwiBase.from_dict, __wees)
-    f.traverse(ZwiBase.from_dict, __wers)
-
     db0 = DataBase.db_connect()
     db1 = DataBase.db_connect('/tmp/zwi_test.db', reset=True)
     db2 = DataBase.db_connect('/tmp/zwi_test.db', reset=True)
     db3 = DataBase.db_connect()
 
-    assert db0==db3
-    assert db2!=db3
+    assert db0 == db3
+    assert db2 != db3
 
     print(f"{db1=} {db1.table_exists('followers')=}")
     print(f"{db1=} {db1.table_exists('followees')=}")
 
-    setup(1, 1)
-    _gui(db0)
     db1.close()
-
     pass
-
-def db_setup(reset=False):
-    """Generate the initial database.
-    Currently, I only snarf in the followers table.
-    Currently, I do not handle updates."""
-
-    db = DataBase.db_connect(reset=reset)
-
-    nascent = not db.table_exists('followers')
-    if nascent:
-        Followers.gen_table(db)
-
-        cl, pr = zwi_init()
-        vec = []
-        start = 0
-
-        while True:
-            fe = pr.request.json('/api/profiles/{}/followers?start={}&limit=200'.format(pr.player_id, start))
-            if len(fe) == 0:
-                break
-
-            for f in fe:
-                start += 1
-                vec.append(f)
-                pass
-            print('\rprocessed followers: {:d}'.format(start), end='')
-            pass
-        print('')
-
-        # I want to add these into the DB in historical order.
-        # It appears that more recent followers are returned first above.
-        vec.reverse()
-
-        start = 0
-        for v in vec:
-            w = Followers(v)
-            w.db_insert(db)
-            start += 1
-            print('\rprocessed followers: {:d}'.format(start), end='')
-            del w
-            pass
-        print('')
-        db.commit()
-        pass
-
-    # determine max column widths
-    Followers.db_colmax(db)
-
-    return db
 
 
 @cli.command()
@@ -1312,7 +1137,7 @@ def reset():
     """Reset the database, refresh followers/followees data."""
 
     db = DataBase.db_connect(reset=True)
-    usr = ZwiUser(db, update=True)
+    ZwiUser(db, update=True)
 
     return 0
 
