@@ -1036,7 +1036,7 @@ def gui():
 
                 path = f'''{self._path}/{key.split('/')[-1]}'''
                 if not os.path.isfile(path):
-                    self._fetch(key)
+                    self._fetch(key, path)
                     pass
 
                 if os.path.isfile(path):
