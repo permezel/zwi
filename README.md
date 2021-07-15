@@ -5,15 +5,18 @@ This is a small python programme to facilitate maintaining the followers lists.
 
 # Requirements
 
-    python3 with tkinter support
+    python3
     pip3
     click
     zwift-client
     keyring
+    PyQt5
 
     pip3 install click
     pip3 install keyring
     pip3 install zwift-client
+    pip3 install PyQt5
+
   
 # Usage
 
@@ -50,10 +53,14 @@ The `reset` function deletes the `${HOME}/.zwi/zwi.db` database file if it exist
    ./zwi.py gui --help
    ./zwi.py gui
 
-The `gui` function pops up a window representing a desire to write more code.
+The `gui` function pops up a window displaying data from the local database copy of the Zwift `followers` and `followees` tables.
 
-Using the Zwift user login information provided (see below) the followers list is obtained and stored locally in a database.
-Currently, the list is not refreshed.  Working on it.
+Key Bingings (for OSX):
+    CMD-1  Switch to `followers` table.
+    CMD-2  Switch to `followees` table.
+    CMD-n  Move to next entry.
+    CMD-p  Move to previous entry.
+    CMD-q  Quit
    
 ## Followees
 
@@ -85,9 +92,6 @@ When manually deleting followees, and searching by name, I find it helps to type
 # User Feedback
 
 ## Issues
-
-The OSX version of `python3` does not seem to have `tkinter` support.
-I found that installing from [python.org](https://python.org/) fixed things, although I do not fully understand how or why on my particular system(s).
 
 If you have any problems with or questions about this image, please contact me
 through a [GitHub issue](https://github.com/permezel/zwi/issues).
