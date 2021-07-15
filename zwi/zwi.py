@@ -197,7 +197,7 @@ def zwi_init():
 def followees():
     count = 0
     usr = ZwiUser()
-    for r in usr.wers:
+    for r in usr.wees:
         d = dict(zip(usr.cols, r))
         count += 1
         boo = (d['followeeStatusOfLoggedInPlayer'] != d['followerStatusOfLoggedInPlayer'])
@@ -793,8 +793,10 @@ class ZwiUser(object):
 
 
 @cli.command()
-def gui():
-    """Play with Qt to see if can use...."""
+def oldgui():
+    """Play with Qt to see if can use....
+    I will be removing this soon.
+    """
     try:
         import PyQt5
         from PyQt5.QtWidgets import QApplication, QWidget, QPushButton, QVBoxLayout, QTableWidget
@@ -803,6 +805,8 @@ def gui():
         from PyQt5.QtGui import (QPainter, QPolygonF, QIcon, QPixmap, QBrush, QPen, QColor, QFont)
         from PyQt5.QtWidgets import (QAbstractItemView, QApplication, QStyle,
                                      QStyledItemDelegate, QTableWidget, QTableWidgetItem, QWidget,
+                                     QGridLayout,
+                                     QMainWindow,
                                      QStyleOptionViewItem)
         import shutil
         import urllib.request
@@ -1176,6 +1180,37 @@ def gui():
     tab.resize(1024, 1024)
     tab.show()
 
+    label = PyQt5.QtWidgets.QLabel()
+    for dname, subd, files in os.walk(get_zdir('.image-cache')):
+        while True:
+            for f in files:
+                px = QPixmap(f)
+                label.resize(px.size())
+                label.setPixmap(px)
+                label.show()
+                break
+                pass
+            break
+            pass
+        pass
+
+    class MyBut(QWidget):
+        def __init__(self, texts, parent):
+            QWidget.__init__(self, parent)
+
+            gridLayout = QGridLayout()
+            for i in range(0, texts.size()):
+                text = texts[i]
+                button = QPushButton(text)
+                # ?? connect(button, QPushButton.clicked, [self, text] { clicked(text); })
+                gridLayout.addWidget(button, i / 3, i % 3)
+
+            setLayout(gridLayout)
+            pass
+        pass
+
+    MyBut(['1','2','3'], label)
+
     QApplication.processEvents()
     sys.exit(app.exec_())
     pass
@@ -1216,6 +1251,335 @@ def reset():
     return 0
 
 
+@cli.command()
+def gui():
+    """ZwiView."""
+    try:
+        import PyQt5
+        from PyQt5 import QtCore, QtGui, QtWidgets, uic
+        from PyQt5.QtWidgets import QApplication, QWidget, QPushButton, QVBoxLayout, QTableWidget
+        from PyQt5.QtCore import (pyqtSignal, QPointF, QRect, QSize, Qt,
+                                  QRunnable, QThreadPool, QMutex, QSemaphore)
+        from PyQt5.QtGui import (QPainter, QPolygonF, QIcon, QPixmap, QBrush, QPen, QColor, QFont)
+        from PyQt5.QtWidgets import (QAbstractItemView, QApplication, QStyle,
+                                     QStyledItemDelegate, QTableWidget, QTableWidgetItem, QWidget,
+                                     QGridLayout,
+                                     QMainWindow,
+                                     QGraphicsScene,
+                                     QStyleOptionViewItem)
+    except Exception as e:
+        print('import error', e)
+        print('pip3 install pyqt5')
+        sys.exit(1)
+        pass
+
+    qtcreator_file  = "zwi_ui_v0.ui" # Enter file here.
+    Ui_MainWindow, QtBaseClass = uic.loadUiType(qtcreator_file)
+
+    class ImageCache(QRunnable):
+        def __init__(self, sig):
+            super().__init__()
+            self.setAutoDelete(False)
+            self._queue = list()
+            self._done = list()
+            self._cache = dict()
+            self._context = self._ssl_kluge()
+            self._threads = list()
+            self._path = get_zdir('.image-cache')
+            self._mux = QMutex()
+            self._requ = QSemaphore()
+            self._resp = QSemaphore()
+            self._pool = QThreadPool.globalInstance()
+            self._sig = sig
+            self._terminate = False
+            self._nthreads = 0
+            pass
+
+        def load(self, key, widget):
+            """Load an image into the cache."""
+            # print(f'{self=} {key=}')
+            self._mux.lock()
+            if key in self._cache:
+                px = self._cache[key]
+            else:
+                self._cache[key] = px = None
+                self._queue.insert(0, (key, widget))
+                self._requ.release()
+                if self._nthreads == 0:
+                    self._terminate = False
+                    self._pool.start(self)
+                    self._nthreads = 1
+                    pass
+                pass
+            self._mux.unlock()
+            return px
+
+        def run(self):
+            """Thread function."""
+            # print(f'running: {self=}')
+            while True:
+                self._requ.acquire()
+                self._mux.lock()
+                if self._terminate:
+                    if len(self._queue) != 0:
+                        # print(f'{self=} {self._terminate=} {self._nthreads=} {self._queue=}')
+                        self._terminate = False
+                    else:
+                        self._terminate = False
+                        self._nthreads = 0
+                        assert len(self._queue) == 0
+                        self._mux.unlock()
+                        return
+                    pass
+
+                if len(self._queue) == 0:
+                    # print(f'wtf? {len(self._queue)=}')
+                    wrk = None
+                else:
+                    wrk = self._queue.pop()
+                    pass
+                self._mux.unlock()
+                if wrk is None:
+                    continue
+
+                key = wrk[0]
+                if key == 'None' or 'http' not in key:
+                    continue  # some are None???
+
+                path = f'''{self._path}/{key.split('/')[-1]}'''
+                if not os.path.isfile(path):
+                    self._fetch(key, path)
+                    pass
+
+                if os.path.isfile(path):
+                    self._mux.lock()
+                    self._done.insert(0, wrk)
+                    self._mux.unlock()
+                    self._sig.emit(1)
+                    pass
+                time.sleep(.001)
+                pass
+            pass
+
+        @staticmethod
+        def _ssl_kluge():
+            """Need this to avoid certificate validation errors."""
+            import ssl
+            context = ssl.create_default_context()
+            context.check_hostname = False
+            context.verify_mode = ssl.CERT_NONE
+            return context
+
+        def update(self):
+            self._mux.lock()
+            while len(self._done) > 0:
+                wrk = self._done.pop()
+                key, wid = wrk[0], wrk[1]
+                px = self._cache[key] = QPixmap(f'''{self._path}/{key.split('/')[-1]}''')
+                self._mux.unlock()
+                wid.imageLoaded(key, px)
+                self._mux.lock()
+                pass
+
+            # see if we are all done
+            if len(self._queue) == 0 and not self._terminate and self._nthreads > 0:
+                # print(f'request thread to terminate')
+                self._terminate = True
+                self._requ.release()
+                pass
+            self._mux.unlock()
+            pass
+
+        def _fetch(self, url, path):
+            """Try to fetch the resource and stack in file."""
+            import shutil
+            import urllib.request
+
+            try:
+                with urllib.request.urlopen(url, context=self._context) as resp:
+                    f = open(path, 'wb')
+                    shutil.copyfileobj(resp, f)
+                    f.close()
+            except Exception as e:
+                print(f'oops: {e}')
+                self._mux.lock()
+                del self._cache[url]
+                try:
+                    os.remove(path)
+                except Exception as e:
+                    pass
+                self._mux.unlock()
+                pass
+            pass
+
+        pass
+
+    pass
+
+    class MyWindow(QtWidgets.QMainWindow, Ui_MainWindow):
+        sig = pyqtSignal(int, name='results')
+
+        def __init__(self):
+            QtWidgets.QMainWindow.__init__(self)
+            Ui_MainWindow.__init__(self)
+            self.setupUi(self)
+            self.setup()
+            pass
+    
+        def setup(self):
+            self._status = self.statusBar()
+            self._status.showMessage('Hi there')
+            self.sig.connect(self.handle)
+            self.butNext.clicked.connect(self.doNext)
+            self.butPrev.clicked.connect(self.doPrev)
+            self.actionwees.triggered.connect(self.doWees)
+            self.actionwers.triggered.connect(self.doWers)
+            self.actionauto.triggered.connect(self.doAuto)
+            self.actionnext.triggered.connect(self.doNext)
+            self.actionprev.triggered.connect(self.doPrev)
+            self.actionquit.triggered.connect(self.doQuit)
+            self.actionreset.triggered.connect(self.doReset)
+
+            self.sb.valueChanged.connect(self.sbValueChanged)
+
+            self._usr = ZwiUser()
+            self._icache = ImageCache(self.sig)
+            self.switch('wers')
+
+        def sbValueChanged(self, val):
+            if val < self._max:
+                self._idx = val
+                pass
+            self.refresh(0)
+            pass
+                
+        def doWees(self):
+            self.switch('wees')
+            pass
+
+        def doWers(self):
+            self.switch('wers')
+            pass
+
+        def doAuto(self):
+            pass
+
+        def doNext(self):
+            self.refresh(1)
+            pass
+
+        def doPrev(self):
+            self.refresh(-1)
+            pass
+
+        def doQuit(self):
+            self.close()
+            pass
+
+        def doReset(self):
+            """Reset the image cache."""
+            self._icache = ImageCache(self.sig)
+            pass
+
+        def handle(self, index):
+            self._icache.update()
+            pass
+
+        def switch(self, which):
+            if which == 'wers':
+                self._data = self._usr.wers
+            else:
+                self._data = self._usr.wees
+                pass
+            self._idx = 0
+            self._max = len(self._data)-1
+            self.sb.setMaximum(self._max)
+            self.sb.setMinimum(0)
+            self.setWindowTitle(f'ZwiView -- follo{which}')
+            self.refresh(0)
+            pass
+        
+        def refresh(self, delta=0):
+            self._idx += delta
+            if self._idx > self._max:
+                self._idx = 0
+            elif self._idx < 0:
+                self._idx = self._max
+                pass
+                
+            self.sb.setValue(self._idx)
+            
+            try:
+                r = self._data[self._idx]
+            except Exception as e:
+                print(f'{e=} {self._idx=} {self._max=} {len(self._data)=}')
+                return
+            
+            d = dict(zip(self._usr.cols, r))
+            self.firstName.setText(d['firstName'])
+            self.lastName.setText(d['lastName'])
+
+            if d['followerStatusOfLoggedInPlayer'] == 'IS_FOLLOWING':
+                self.isWer.setText('I am following')
+            else:
+                self.isWer.setText('I am not following: ' + d['followerStatusOfLoggedInPlayer'])
+                pass
+
+            if d['followeeStatusOfLoggedInPlayer'] == 'IS_FOLLOWING':
+                self.isWee.setText('Following me.')
+            else:
+                self.isWee.setText('Not following me: ' + d['followeeStatusOfLoggedInPlayer'])
+                pass
+
+            boo = (d['followeeStatusOfLoggedInPlayer'] != d['followerStatusOfLoggedInPlayer'])
+            url = d['imageSrc']
+            if d == 'None':
+                url = d['imageSrcLarge']
+                pass
+
+            scene = QGraphicsScene()
+            if url == 'None':
+                scene.addText('No image provided')
+                self._status.showMessage(f'{1+self._idx}')
+            else:
+                px = self._icache.load(url, self)
+                if px is not None:
+                    scene.addPixmap(px)
+                    self._status.showMessage(f'{1+self._idx}')
+                else:
+                    scene.addText('loading...')
+                    self._status.showMessage(url + ' -- loading')
+                    self._image_load_key = url
+                    pass
+                pass
+
+            self.graphicsView.setScene(scene)
+            self.graphicsView.show()
+            self.show()
+            pass
+
+        def imageLoaded(self, key, px):
+            if key == self._image_load_key:
+                scene = QGraphicsScene()
+                scene.addPixmap(px)
+                self.graphicsView.setScene(scene)
+                self.graphicsView.show()
+                self.show()
+                self._status.showMessage(f'{1+self._idx}')
+                pass
+            pass
+            
+        pass
+    
+
+    
+    app = QtWidgets.QApplication([])
+    window = MyWindow()
+    window.show()
+    sys.exit(app.exec_())
+    pass
+
+    
 if __name__ == '__main__':
     try:
         cli()
