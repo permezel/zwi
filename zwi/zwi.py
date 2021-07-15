@@ -1219,7 +1219,6 @@ def oldgui():
 @cli.command()
 def test():
     """Perform some modicum of internal tests."""
-
     try:
         raise Exception('yo!')
     except Exception as e:
@@ -1244,7 +1243,6 @@ def test():
 @cli.command()
 def reset():
     """Reset the database, refresh followers/followees data."""
-
     db = DataBase.db_connect(reset=True)
     ZwiUser(db, update=True)
 
@@ -1258,7 +1256,7 @@ def gui():
         import PyQt5
         from PyQt5 import QtCore, QtGui, QtWidgets, uic
         from PyQt5.QtWidgets import QApplication, QWidget, QPushButton, QVBoxLayout, QTableWidget
-        from PyQt5.QtCore import (pyqtSignal, QPointF, QRect, QSize, Qt,
+        from PyQt5.QtCore import (pyqtSignal, QPointF, QRect, QSize, Qt, QTimer,
                                   QRunnable, QThreadPool, QMutex, QSemaphore)
         from PyQt5.QtGui import (QPainter, QPolygonF, QIcon, QPixmap, QBrush, QPen, QColor, QFont)
         from PyQt5.QtWidgets import (QAbstractItemView, QApplication, QStyle,
@@ -1273,7 +1271,7 @@ def gui():
         sys.exit(1)
         pass
 
-    qtcreator_file  = "zwi_ui_v0.ui" # Enter file here.
+    qtcreator_file  = "zwi_ui_v0.ui"
     Ui_MainWindow, QtBaseClass = uic.loadUiType(qtcreator_file)
 
     class ImageCache(QRunnable):
@@ -1313,6 +1311,24 @@ def gui():
                 pass
             self._mux.unlock()
             return px
+
+        def autoDelete(self):
+            print(f'autodel: {self=}')
+            return False
+        
+        def stop(self):
+            while True:
+                self._mux.lock()
+                if self._nthreads > 0:
+                    # XXX: what about if it is blocked on a semaphore?
+                    self._terminate = True
+                    print('waiting for thread to terminate....')
+                    time.sleep(1)
+                else:
+                    self._mux.unlock()
+                    return
+                pass
+            pass
 
         def run(self):
             """Thread function."""
@@ -1427,11 +1443,15 @@ def gui():
             pass
     
         def setup(self):
+            self._timer = None
             self._status = self.statusBar()
             self._status.showMessage('Hi there')
             self.sig.connect(self.handle)
+
             self.butNext.clicked.connect(self.doNext)
             self.butPrev.clicked.connect(self.doPrev)
+            self.butQuit.clicked.connect(self.doQuit)
+
             self.actionwees.triggered.connect(self.doWees)
             self.actionwers.triggered.connect(self.doWers)
             self.actionauto.triggered.connect(self.doAuto)
@@ -1445,6 +1465,7 @@ def gui():
             self._usr = ZwiUser()
             self._icache = ImageCache(self.sig)
             self.switch('wers')
+            pass
 
         def sbValueChanged(self, val):
             if val < self._max:
@@ -1462,18 +1483,45 @@ def gui():
             pass
 
         def doAuto(self):
+            if self._timer is None:
+                self._timer = QTimer()
+                self._timer.timeout.connect(lambda: self.refresh(1))
+                self._timer.start(2*1000)
+            else:
+                self._timer.stop()
+                del self._timer
+                self._timer = NOne
+                pass
             pass
 
         def doNext(self):
+            if self._timer:
+                i = self._timer.interval()
+                self._timer.setInterval(i*2)
+                return
             self.refresh(1)
             pass
 
         def doPrev(self):
+            if self._timer:
+                i = self._timer.interval()
+                self._timer.setInterval(100 + int(i/2))
+                return
             self.refresh(-1)
             pass
 
         def doQuit(self):
             self.close()
+            pass
+
+        def close(self):
+            if self._timer:
+                self._timer.stop()
+                pass
+            if self._icache:
+                self._icache.stop()
+                pass
+            super().close()
             pass
 
         def doReset(self):
