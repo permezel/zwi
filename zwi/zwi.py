@@ -13,6 +13,7 @@
 import sys
 import os
 import time
+import signal
 import sqlite3 as sq
 from datetime import datetime
 from dataclasses import dataclass, asdict, astuple, fields
@@ -851,8 +852,15 @@ def gui():
         sys.exit(1)
         pass
 
-    qtcreator_file  = "zwi_ui_v0.ui"
-    Ui_MainWindow, QtBaseClass = uic.loadUiType(qtcreator_file)
+    try:
+        sdir = os.path.dirname(os.path.realpath(__file__)) + os.sep
+        sfile  = sdir + 'zwi_ui_v0.ui'
+        Ui_MainWindow, QtBaseClass = uic.loadUiType(sfile)
+    except Exception as e:
+        print(f'{e}')
+        print(f"Can't find GUI script file: {sfile}.")
+        sys.exit(1)
+        pass
 
     class ImageCache(QRunnable):
         def __init__(self, sig):
@@ -1281,6 +1289,16 @@ def gui():
     pass
 
     
+def keyboardInterruptHandler(signal, frame):
+    print("KeyboardInterrupt (signal: {}) has been caught. Cleaning up...".format(signal))
+    exit(0)
+
+# XXX: This works, but not entirely.
+# I find I have to interact with the GUI to get it to fire
+# after ^C
+#
+signal.signal(signal.SIGINT, keyboardInterruptHandler)
+
 if __name__ == '__main__':
     try:
         cli()
