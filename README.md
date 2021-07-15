@@ -56,6 +56,7 @@ The `reset` function deletes the `${HOME}/.zwi/zwi.db` database file if it exist
 The `gui` function pops up a window displaying data from the local database copy of the Zwift `followers` and `followees` tables.
 
 Key Bingings (for OSX):
+
     CMD-1  Switch to `followers` table.
     CMD-2  Switch to `followees` table.
     CMD-n  Move to next entry.
@@ -63,6 +64,7 @@ Key Bingings (for OSX):
     CMD-q  Quit
 
 If `auto` mode is enabled (menu item) then:
+
     CMD-n  increase interval
     CMD-p  decrease interval
 
