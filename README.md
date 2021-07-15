@@ -61,7 +61,13 @@ Key Bingings (for OSX):
     CMD-n  Move to next entry.
     CMD-p  Move to previous entry.
     CMD-q  Quit
-   
+
+If `auto` mode is enabled (menu item) then:
+    CMD-n  increase interval
+    CMD-p  decrease interval
+
+The slider at the bottom can be used to move rapidly thru the list.
+
 ## Followees
 
    ./zwi.py wees --help
