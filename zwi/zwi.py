@@ -1254,14 +1254,18 @@ def gui():
     """ZwiView."""
     try:
         import PyQt5
+        from PyQt5.QtWidgets import QApplication
+        from PyQt5.QtGui import QPalette, QColor
         from PyQt5 import QtCore, QtGui, QtWidgets, uic
         from PyQt5.QtWidgets import QApplication, QWidget, QPushButton, QVBoxLayout, QTableWidget
         from PyQt5.QtCore import (pyqtSignal, QPointF, QRect, QSize, Qt, QTimer,
+                                  QFile,
                                   QRunnable, QThreadPool, QMutex, QSemaphore)
         from PyQt5.QtGui import (QPainter, QPolygonF, QIcon, QPixmap, QBrush, QPen, QColor, QFont)
         from PyQt5.QtWidgets import (QAbstractItemView, QApplication, QStyle,
                                      QStyledItemDelegate, QTableWidget, QTableWidgetItem, QWidget,
                                      QGridLayout,
+                                     QDialog, QLineEdit, QMessageBox,
                                      QMainWindow,
                                      QGraphicsScene,
                                      QStyleOptionViewItem)
@@ -1458,7 +1462,15 @@ def gui():
             self.actionnext.triggered.connect(self.doNext)
             self.actionprev.triggered.connect(self.doPrev)
             self.actionquit.triggered.connect(self.doQuit)
-            self.actionreset.triggered.connect(self.doReset)
+            # reset menu
+            self.actionicache.triggered.connect(self.doResetIcache)
+            self.actiondbase.triggered.connect(self.doResetDBase)
+            self.actionauthen.triggered.connect(self.doResetAuthen)
+            # sort menu
+            self.actionfirst_name.triggered.connect(self.doSortFirstName)
+            self.actionlast_name.triggered.connect(self.doSortLastName)
+            self.actionplayer_type.triggered.connect(self.doSortPlayerType)
+            self.actioncountry.triggered.connect(self.doSortCountry)
 
             self.sb.valueChanged.connect(self.sbValueChanged)
 
@@ -1514,6 +1526,54 @@ def gui():
             self.close()
             pass
 
+        def doResetIcache(self):
+            """Reset the image cache."""
+            self._icache = ImageCache(self.sig)
+            pass
+            
+        def doResetDBase(self):
+            """Reset the local data base cache of Zwift data."""
+            db = DataBase.db_connect(reset=True)
+            ZwiUser(db, update=True)
+            self.switch('wers')	# necessary(?) side effect.
+            pass
+
+        def doResetAuthen(self):
+            """(eventually)Reset the Zwift user authentication."""
+            f = QMessageBox(parent=self)
+            f.setText('Use `zwi clear` to reset the Zwift user authentication.')
+            f.exec_()
+            pass
+            
+        def doSortFirstName(self):
+            self.doSort('firstName')
+            pass
+        
+        def doSortLastName(self):
+            self.doSort('lastName')
+            pass
+        
+        def doSortPlayerType(self):
+            self.doSort('playerType')
+            pass
+
+        def doSortCountry(self):
+            self.doSort('countryAlpha3')
+            pass
+        
+        def doSort(self, col):
+            """Sort current table by country."""
+            idx = self._usr.cols.index(col)
+            rev = self.actionreverse.isChecked()
+
+            def sel(elem):
+                return elem[idx]
+
+            self._data = sorted(self._data, key=sel, reverse=rev)
+            self._idx = 0
+            self.refresh(0)
+            pass
+            
         def close(self):
             if self._timer:
                 self._timer.stop()
@@ -1522,11 +1582,6 @@ def gui():
                 self._icache.stop()
                 pass
             super().close()
-            pass
-
-        def doReset(self):
-            """Reset the image cache."""
-            self._icache = ImageCache(self.sig)
             pass
 
         def handle(self, index):
@@ -1568,17 +1623,20 @@ def gui():
             self.lastName.setText(d['lastName'])
 
             if d['followerStatusOfLoggedInPlayer'] == 'IS_FOLLOWING':
-                self.isWer.setText('I am following')
+                self.isWer.setText('following')
             else:
-                self.isWer.setText('I am not following: ' + d['followerStatusOfLoggedInPlayer'])
+                self.isWer.setText('not following: ' + d['followerStatusOfLoggedInPlayer'])
                 pass
 
             if d['followeeStatusOfLoggedInPlayer'] == 'IS_FOLLOWING':
-                self.isWee.setText('Following me.')
+                self.isWee.setText('followed')
             else:
-                self.isWee.setText('Not following me: ' + d['followeeStatusOfLoggedInPlayer'])
+                self.isWee.setText('not followed: ' + d['followeeStatusOfLoggedInPlayer'])
                 pass
 
+            self.country.setText(f'''     country: {d['countryAlpha3']}''')
+            self.rtype.setText(  f'''player type: {d['playerType']}''')
+            
             boo = (d['followeeStatusOfLoggedInPlayer'] != d['followerStatusOfLoggedInPlayer'])
             url = d['imageSrc']
             if d == 'None':
@@ -1620,8 +1678,27 @@ def gui():
         pass
     
 
-    
     app = QtWidgets.QApplication([])
+    # Force the style to be the same on all OSs:
+    app.setStyle("Fusion")
+
+    # Now use a palette to switch to dark colors:
+    palette = QPalette()
+    palette.setColor(QPalette.Window, QColor(53, 53, 53))
+    palette.setColor(QPalette.WindowText, Qt.yellow)
+    palette.setColor(QPalette.Base, QColor(25, 25, 25))
+    palette.setColor(QPalette.AlternateBase, QColor(53, 53, 53))
+    palette.setColor(QPalette.ToolTipBase, Qt.black)
+    palette.setColor(QPalette.ToolTipText, Qt.yellow)
+    palette.setColor(QPalette.Text, Qt.green)
+    palette.setColor(QPalette.Button, QColor(53, 53, 53))
+    palette.setColor(QPalette.ButtonText, Qt.green)
+    palette.setColor(QPalette.BrightText, Qt.red)
+    palette.setColor(QPalette.Link, QColor(42, 130, 218))
+    palette.setColor(QPalette.Highlight, QColor(42, 130, 218))
+    palette.setColor(QPalette.HighlightedText, Qt.black)
+    app.setPalette(palette)
+
     window = MyWindow()
     window.show()
     sys.exit(app.exec_())
