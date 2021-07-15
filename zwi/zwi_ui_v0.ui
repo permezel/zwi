@@ -6,8 +6,8 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>1083</width>
-    <height>1061</height>
+    <width>1078</width>
+    <height>1072</height>
    </rect>
   </property>
   <property name="windowTitle">
@@ -19,8 +19,8 @@
      <rect>
       <x>30</x>
       <y>20</y>
-      <width>1027</width>
-      <height>968</height>
+      <width>1021</width>
+      <height>991</height>
      </rect>
     </property>
     <layout class="QVBoxLayout" name="verticalLayout">
@@ -52,25 +52,114 @@
       </widget>
      </item>
      <item>
-      <widget class="QLabel" name="isWer">
-       <property name="text">
-        <string>follower</string>
+      <widget class="QGroupBox" name="groupBox_2">
+       <property name="sizePolicy">
+        <sizepolicy hsizetype="Preferred" vsizetype="Fixed">
+         <horstretch>0</horstretch>
+         <verstretch>0</verstretch>
+        </sizepolicy>
        </property>
-      </widget>
-     </item>
-     <item>
-      <widget class="QLabel" name="isWee">
-       <property name="text">
-        <string>followee</string>
+       <property name="minimumSize">
+        <size>
+         <width>0</width>
+         <height>64</height>
+        </size>
        </property>
+       <property name="baseSize">
+        <size>
+         <width>0</width>
+         <height>0</height>
+        </size>
+       </property>
+       <property name="title">
+        <string/>
+       </property>
+       <widget class="QWidget" name="widget" native="true">
+        <property name="geometry">
+         <rect>
+          <x>0</x>
+          <y>10</y>
+          <width>251</width>
+          <height>71</height>
+         </rect>
+        </property>
+        <widget class="QLabel" name="isWee">
+         <property name="geometry">
+          <rect>
+           <x>0</x>
+           <y>20</y>
+           <width>1025</width>
+           <height>16</height>
+          </rect>
+         </property>
+         <property name="text">
+          <string>followee</string>
+         </property>
+        </widget>
+        <widget class="QLabel" name="isWer">
+         <property name="geometry">
+          <rect>
+           <x>0</x>
+           <y>0</y>
+           <width>901</width>
+           <height>20</height>
+          </rect>
+         </property>
+         <property name="text">
+          <string>follower</string>
+         </property>
+        </widget>
+       </widget>
+       <widget class="QWidget" name="widget_2" native="true">
+        <property name="geometry">
+         <rect>
+          <x>259</x>
+          <y>10</y>
+          <width>181</width>
+          <height>61</height>
+         </rect>
+        </property>
+        <widget class="QLabel" name="country">
+         <property name="geometry">
+          <rect>
+           <x>0</x>
+           <y>0</y>
+           <width>181</width>
+           <height>16</height>
+          </rect>
+         </property>
+         <property name="text">
+          <string>country</string>
+         </property>
+        </widget>
+        <widget class="QLabel" name="rtype">
+         <property name="geometry">
+          <rect>
+           <x>0</x>
+           <y>20</y>
+           <width>181</width>
+           <height>16</height>
+          </rect>
+         </property>
+         <property name="text">
+          <string>rtype</string>
+         </property>
+        </widget>
+       </widget>
       </widget>
      </item>
      <item>
       <widget class="QGraphicsView" name="graphicsView">
+       <property name="sizePolicy">
+        <sizepolicy hsizetype="Fixed" vsizetype="Fixed">
+         <horstretch>0</horstretch>
+         <verstretch>0</verstretch>
+        </sizepolicy>
+       </property>
        <property name="minimumSize">
         <size>
-         <width>800</width>
-         <height>600</height>
+         <width>1024</width>
+         <height>768</height>
         </size>
        </property>
       </widget>
@@ -137,7 +226,7 @@
     <rect>
      <x>0</x>
      <y>0</y>
-     <width>1083</width>
+     <width>1078</width>
      <height>24</height>
     </rect>
    </property>
@@ -149,14 +238,43 @@
     <addaction name="actionwees"/>
     <addaction name="separator"/>
     <addaction name="actionauto"/>
-    <addaction name="actionreset"/>
     <addaction name="separator"/>
     <addaction name="actionnext"/>
     <addaction name="actionprev"/>
     <addaction name="separator"/>
     <addaction name="actionquit"/>
    </widget>
+   <widget class="QMenu" name="menuReset">
+    <property name="title">
+     <string>Reset</string>
+    </property>
+    <addaction name="actiondbase"/>
+    <addaction name="separator"/>
+    <addaction name="actionicache"/>
+    <addaction name="separator"/>
+    <addaction name="actionauthen"/>
+   </widget>
+   <widget class="QMenu" name="menusort">
+    <property name="title">
+     <string>Sort</string>
+    </property>
+    <addaction name="actionfirst_name"/>
+    <addaction name="actionlast_name"/>
+    <addaction name="actioncountry"/>
+    <addaction name="actionplayer_type"/>
+    <addaction name="separator"/>
+    <addaction name="actionreverse"/>
+   </widget>
+   <widget class="QMenu" name="menusearch">
+    <property name="title">
+     <string>Search</string>
+    </property>
+    <addaction name="actionsearch"/>
+   </widget>
    <addaction name="menuZwiView"/>
+   <addaction name="menuReset"/>
+   <addaction name="menusort"/>
+   <addaction name="menusearch"/>
   </widget>
   <action name="actionwees">
    <property name="text">
@@ -189,6 +307,9 @@
    <property name="text">
     <string>auto</string>
    </property>
+   <property name="shortcut">
+    <string>Ctrl+A</string>
+   </property>
   </action>
   <action name="actionnext">
    <property name="text">
@@ -206,9 +327,55 @@
     <string>Ctrl+P</string>
    </property>
   </action>
-  <action name="actionreset">
+  <action name="actionicache">
    <property name="text">
-    <string>reset</string>
+    <string>icache</string>
+   </property>
+  </action>
+  <action name="actiondbase">
+   <property name="text">
+    <string>dbase</string>
+   </property>
+  </action>
+  <action name="actionauthen">
+   <property name="text">
+    <string>authen</string>
+   </property>
+  </action>
+  <action name="actionfirst_name">
+   <property name="text">
+    <string>first name</string>
+   </property>
+  </action>
+  <action name="actionlast_name">
+   <property name="text">
+    <string>last name</string>
+   </property>
+  </action>
+  <action name="actioncountry">
+   <property name="text">
+    <string>country</string>
+   </property>
+  </action>
+  <action name="actionplayer_type">
+   <property name="text">
+    <string>player type</string>
+   </property>
+  </action>
+  <action name="actionreverse">
+   <property name="checkable">
+    <bool>true</bool>
+   </property>
+   <property name="text">
+    <string>reverse</string>
+   </property>
+  </action>
+  <action name="actionsearch">
+   <property name="text">
+    <string>Search</string>
+   </property>
+   <property name="shortcut">
+    <string>Ctrl+F</string>
    </property>
   </action>
  </widget>
