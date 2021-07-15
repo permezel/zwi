@@ -41,8 +41,8 @@ The `check` function will verify that the stored credentials function.
 
 `zwi` maintains state in `${HOME}/.zwi/`.  An `sqlite3` database is used to cache the state of the user's `followers` and `followees` lists.
 
-   ./zwi.py reset --help
-   ./zwi.py reset
+    ./zwi.py reset --help
+    ./zwi.py reset
 
 The `reset` function deletes the `${HOME}/.zwi/zwi.db` database file if it exists, creates the `sqlite3` database, and populates the database with the `followers` and `followees` tables.
 
@@ -50,8 +50,8 @@ The `reset` function deletes the `${HOME}/.zwi/zwi.db` database file if it exist
 
 ## Gui
 
-   ./zwi.py gui --help
-   ./zwi.py gui
+    ./zwi.py gui --help
+    ./zwi.py gui
 
 The `gui` function pops up a window displaying data from the local database copy of the Zwift `followers` and `followees` tables.
 
@@ -72,8 +72,8 @@ The slider at the bottom can be used to move rapidly thru the list.
 
 ## Followees
 
-   ./zwi.py wees --help
-   ./zwi.py wees
+    ./zwi.py wees --help
+    ./zwi.py wees
 
 The `wees` function will check the cached followees list (them who's followed).
 Any subject who is being followed but who is not reciprocating is displayed.
@@ -81,8 +81,8 @@ You will have to manually search for the user in the Zwift companion and decide 
 
 ## Followers
 
-   ./zwi.py wers --help
-   ./zwi.py wers
+    ./zwi.py wers --help
+    ./zwi.py wers
 
 The `wers` function will check the cached followers list and display any lacking reciprocity.
 Certain users will follow you, but not respond to reciprocal follow requests, remaining forever in limbo.
