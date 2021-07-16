@@ -28,27 +28,73 @@
       <enum>QLayout::SetMinimumSize</enum>
      </property>
      <item>
-      <widget class="QLabel" name="firstName">
-       <property name="font">
-        <font>
-         <pointsize>16</pointsize>
-        </font>
+      <widget class="QGroupBox" name="groupBox">
+       <property name="enabled">
+        <bool>true</bool>
        </property>
-       <property name="text">
-        <string>FirstName</string>
+       <property name="sizePolicy">
+        <sizepolicy hsizetype="Preferred" vsizetype="Fixed">
+         <horstretch>0</horstretch>
+         <verstretch>0</verstretch>
+        </sizepolicy>
        </property>
-      </widget>
-     </item>
-     <item>
-      <widget class="QLabel" name="lastName">
-       <property name="font">
-        <font>
-         <pointsize>16</pointsize>
-        </font>
+       <property name="minimumSize">
+        <size>
+         <width>1024</width>
+         <height>64</height>
+        </size>
        </property>
-       <property name="text">
-        <string>LastName</string>
+       <property name="maximumSize">
+        <size>
+         <width>16777215</width>
+         <height>64</height>
+        </size>
        </property>
+       <property name="baseSize">
+        <size>
+         <width>1024</width>
+         <height>64</height>
+        </size>
+       </property>
+       <property name="title">
+        <string/>
+       </property>
+       <widget class="QLabel" name="firstName">
+        <property name="geometry">
+         <rect>
+          <x>10</x>
+          <y>0</y>
+          <width>511</width>
+          <height>31</height>
+         </rect>
+        </property>
+        <property name="font">
+         <font>
+          <pointsize>16</pointsize>
+         </font>
+        </property>
+        <property name="text">
+         <string>FirstName</string>
+        </property>
+       </widget>
+       <widget class="QLabel" name="lastName">
+        <property name="geometry">
+         <rect>
+          <x>10</x>
+          <y>30</y>
+          <width>501</width>
+          <height>31</height>
+         </rect>
+        </property>
+        <property name="font">
+         <font>
+          <pointsize>16</pointsize>
+         </font>
+        </property>
+        <property name="text">
+         <string>LastName</string>
+        </property>
+       </widget>
       </widget>
      </item>
      <item>
@@ -77,8 +123,8 @@
        <widget class="QWidget" name="widget" native="true">
         <property name="geometry">
          <rect>
-          <x>0</x>
-          <y>20</y>
+          <x>10</x>
+          <y>10</y>
           <width>251</width>
           <height>41</height>
          </rect>
@@ -113,8 +159,8 @@
        <widget class="QWidget" name="widget_2" native="true">
         <property name="geometry">
          <rect>
-          <x>260</x>
-          <y>20</y>
+          <x>290</x>
+          <y>10</y>
           <width>181</width>
           <height>41</height>
          </rect>
@@ -151,7 +197,7 @@
      <item>
       <widget class="QGraphicsView" name="graphicsView">
        <property name="sizePolicy">
-        <sizepolicy hsizetype="Fixed" vsizetype="Fixed">
+        <sizepolicy hsizetype="Fixed" vsizetype="Preferred">
          <horstretch>0</horstretch>
          <verstretch>0</verstretch>
         </sizepolicy>
@@ -162,49 +208,12 @@
          <height>768</height>
         </size>
        </property>
-      </widget>
-     </item>
-     <item>
-      <widget class="QGroupBox" name="groupBox">
-       <property name="title">
-        <string/>
+       <property name="baseSize">
+        <size>
+         <width>1024</width>
+         <height>768</height>
+        </size>
        </property>
-       <layout class="QHBoxLayout" name="horizontalLayout">
-        <item>
-         <widget class="QCommandLinkButton" name="butPrev">
-          <property name="text">
-           <string>Prev</string>
-          </property>
-         </widget>
-        </item>
-        <item>
-         <widget class="QCommandLinkButton" name="butNext">
-          <property name="text">
-           <string>Next</string>
-          </property>
-         </widget>
-        </item>
-        <item>
-         <spacer name="horizontalSpacer_2">
-          <property name="orientation">
-           <enum>Qt::Horizontal</enum>
-          </property>
-          <property name="sizeHint" stdset="0">
-           <size>
-            <width>40</width>
-            <height>20</height>
-           </size>
-          </property>
-         </spacer>
-        </item>
-        <item>
-         <widget class="QCommandLinkButton" name="butQuit">
-          <property name="text">
-           <string>Quit</string>
-          </property>
-         </widget>
-        </item>
-       </layout>
       </widget>
      </item>
      <item>

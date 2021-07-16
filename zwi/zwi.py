@@ -1036,10 +1036,7 @@ def gui():
             self._status.showMessage('Hi there')
             self.sig.connect(self.handle)
 
-            self.butNext.clicked.connect(self.doNext)
-            self.butPrev.clicked.connect(self.doPrev)
-            self.butQuit.clicked.connect(self.doQuit)
-
+            # ZwiView menu
             self.actionwees.triggered.connect(self.doWees)
             self.actionwers.triggered.connect(self.doWers)
             self.actionauto.triggered.connect(self.doAuto)
@@ -1055,7 +1052,9 @@ def gui():
             self.actionlast_name.triggered.connect(self.doSortLastName)
             self.actionplayer_type.triggered.connect(self.doSortPlayerType)
             self.actioncountry.triggered.connect(self.doSortCountry)
-
+            # search menu
+            self.actionsearch.triggered.connect(self.doSearch)
+            # scroll bar
             self.sb.valueChanged.connect(self.sbValueChanged)
 
             self._usr = ZwiUser()
@@ -1130,10 +1129,7 @@ def gui():
 
         def doResetAuthen(self):
             """(eventually)Reset the Zwift user authentication."""
-            f = QMessageBox(parent=self)
-            f.setText('Use `zwi clear` to reset the Zwift user authentication.')
-            f.exec_()
-            pass
+            return self.message('Use `zwi clear` to reset the Zwift user authentication.')
             
         def doSortFirstName(self):
             self.doSort('firstName')
@@ -1163,6 +1159,16 @@ def gui():
             self._idx = 0
             self.refresh(0)
             pass
+            
+        def doSearch(self):
+            """(eventually) search."""
+            return self.message('Yet to be implemented.')
+
+        def message(self, msg='Oops!'):
+            """Raise a modal dialog."""
+            f = QMessageBox(parent=self)
+            f.setText(msg)
+            return f.exec_()
             
         def close(self):
             if self._timer:
