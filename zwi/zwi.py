@@ -1064,10 +1064,9 @@ def gui():
             pass
 
         def sbValueChanged(self, val):
-            if val < self._max:
-                self._idx = val
-                pass
-            self.refresh(0)
+            self._idx = val
+            # self.refresh must keep _idx in range
+            self.refresh(0, fromsb=True)
             pass
                 
         def doWees(self):
@@ -1093,7 +1092,10 @@ def gui():
         def doNext(self):
             if self._timer:
                 i = self._timer.interval()
-                self._timer.setInterval(i*2)
+                if i < 30*1000:
+                    # going slower: just set the interval
+                    self._timer.setInterval(i*2)
+                    pass
                 return
             self.refresh(1)
             pass
@@ -1101,7 +1103,11 @@ def gui():
         def doPrev(self):
             if self._timer:
                 i = self._timer.interval()
-                self._timer.setInterval(100 + int(i/2))
+                if i > 10:
+                    # going faster: stop and restart
+                    self._timer.stop()
+                    self._timer.start(i/2)
+                    pass
                 return
             self.refresh(-1)
             pass
@@ -1186,7 +1192,7 @@ def gui():
             self.refresh(0)
             pass
         
-        def refresh(self, delta=0):
+        def refresh(self, delta=0, fromsb=False):
             self._idx += delta
             if self._idx > self._max:
                 self._idx = 0
@@ -1194,7 +1200,9 @@ def gui():
                 self._idx = self._max
                 pass
                 
-            self.sb.setValue(self._idx)
+            if fromsb == False:
+                self.sb.setValue(self._idx)
+                pass
             
             try:
                 r = self._data[self._idx]
