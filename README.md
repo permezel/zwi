@@ -61,6 +61,7 @@ Key Bingings (for OSX):
     CMD-2  Switch to `followees` table.
     CMD-n  Move to next entry.
     CMD-p  Move to previous entry.
+    CMD-f  Search (not yet implemented).
     CMD-q  Quit
 
 If `auto` mode is enabled (menu item) then:
@@ -69,6 +70,8 @@ If `auto` mode is enabled (menu item) then:
     CMD-p  decrease interval
 
 The slider at the bottom can be used to move rapidly thru the list.
+
+For Linux, it appears the key bindings map to the CTRL key.  The menu items will indicate whatever it is.
 
 ## Followees
 
