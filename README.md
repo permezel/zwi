@@ -1,23 +1,28 @@
 [![logo](https://raw.githubusercontent.com/permezel/zwi/master/logo.png)](https://zwift.com/)
 # zwi
 
-This is a small python programme to facilitate maintaining the followers lists.
+This is a small python programme to facilitate viewing Zwift data.
 
 # Requirements
 
+    A Zwift account username and password
     python3
     pip3
     click
     zwift-client
     keyring
+    pandas
+    bokeh
     PyQt5
 
     pip3 install click
     pip3 install keyring
     pip3 install zwift-client
+    pip3 install pandas
+    pip3 install bokeh
     pip3 install PyQt5
 
-  
+
 # Usage
 
     ./zwi.py --help
@@ -36,17 +41,40 @@ Once authentication has been established, the login credentials need not be pass
     ./zwi.py check
 
 The `check` function will verify that the stored credentials function.
+On `MacOS`, normally, you will not have to enter the login password each time.
+However, whenever the `python` interpreter changes, you will have to do so twice.  Make sure you click the `always allow` button.
 
 ## Initialise/Reset database
 
 `zwi` maintains state in `${HOME}/.zwi/`.  An `sqlite3` database is used to cache the state of the user's `followers` and `followees` lists.
+In addition, the profiles of all Zwift users encountered (via the `followers`/`followees` lists) are saved in a separate database.
 
     ./zwi.py reset --help
     ./zwi.py reset
 
 The `reset` function deletes the `${HOME}/.zwi/zwi.db` database file if it exists, creates the `sqlite3` database, and populates the database with the `followers` and `followees` tables.
+It will not delete the profiles database.
 
-*** Currently, this version only supports a one-time slurp of the `followers` list.
+## Update followers/followees database
+
+    ./zwi.py update --help
+    ./zwi.py -v update
+
+The `update` function refreshes the `followers` and `followees` information.
+(Currently, this function is being fleshed out.  It does not yet report any differences. Also, it fails to profess deletions.)
+
+## Update profile database
+
+    ./zwi.py pro-update --help
+    ./zwi.py [-v] pro-update [--force]
+
+The `pro-update` function will update the local DB profile cache using information in the local Zwift user `followers` and `followees` DB cache.
+
+## List profile database entries
+
+    ./zwi.py pro-list --help
+    ./zwi.py pro-list
+
 
 ## Gui
 

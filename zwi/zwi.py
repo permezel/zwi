@@ -2,198 +2,118 @@
 #
 # -*- coding: utf-8 -*-
 #
-# I follow all those who do not follow themselves.  Who follows me?
-#
-#
-# Usage: ./zwi.py --help
-#
 # Copyright (c) 2021 Damon Anton Permezel, all bugs revered.
-#
 
 import sys
 import os
-import time
 import signal
-import sqlite3 as sq
-from datetime import datetime
-from dataclasses import dataclass, asdict, astuple, fields
+import random
+import time
+
+import util
+from util import ZwiPro, ZwiUser, DataBase, get_zdir
+from dataclasses import dataclass
 
 try:
-    from zwift import Client
-    import keyring
     import click
-except Exception as e:
-    print('import error', e)
-    print('pip3 install zwift-client keyring click')
-    sys.exit(1)
-    pass
-
-verbosity = 0
-debug_lvl = 0
-
-
-def setup(v, d):
-    global verbosity, debug_lvl
-
-    verbosity = v
-    debug_lvl = d
-    return
-
-
-def verbo(lvl, fmt, *args):
-    if verbosity >= lvl:
-        sys.stderr.write(fmt % args + '\n')
-    return
-
-
-def debug(lvl, fmt, *args):
-    if debug_lvl >= lvl:
-        sys.stderr.write(fmt % args + '\n')
-    return
-
-
-class Error(Exception):
-    def __init__(self, data):
-        self.data = data
-        pass
-
-    def __str__(self):
-        return f'{self.data!s}'
-
-    def __repr__(self):
-        return f'{self.data!r}'
-
-    pass
-
-
-def error(data):
-    debug(9, f'error: {data!s}')
-    raise Error(data)
-
-
-def warn(data):
-    sys.stderr.write(f'warning: {data!s}\n')
-    return
-
+except Exception as ex__:
+    print('import error', ex__)
+    raise SystemExit('please run: pip3 install click')
 
 @click.option('-v', '--verbose', count=True)
 @click.option('-d', '--debug', count=True)
 @click.group()
 def cli(verbose, debug):
-    setup(verbose, debug)
+    util.setup(verbose, debug)
     pass
-
 
 @cli.command()
 @click.option('--name', prompt='Enter Zwift username', help='Zwift username')
 @click.password_option(help='Zwift password')
 def auth(name, password):
     """Establish the authentication."""
+    return util.auth(name, password)
 
-    try:
-        cl = Client(name, password)
-        pr = cl.get_profile()
-        pr.check_player_id()
-    except Exception as e:
-        error(f'Authentication failure: {e}')
+
+@cli.command()
+def flask_test():
+    """Test using flask to serve the image cache."""
+    return 0
+    
+    
+@cli.command()
+def test():
+    """Test some things...."""
+    import flask
+    from flask import Flask, redirect, send_file
+    from markupsafe import escape
+    
+    def process(self, wrk):
+        """Process completed URL fetch."""
+        print(f'process: {wrk=}')
+        url = wrk[0]
+        pass
+    
+    def callback(cache):
+        """This callback is called in the worker thread."""
+        print(f'callback: {cache=}')
+        cache.update(process)
         pass
 
-    try:
-        keyring.set_password('zwi.py', 'username', name)
-    except keyring.errors.PasswordSetError:
-        raise SystemExit('Cannot set zwi.py username')
+    idir = get_zdir('.image-cache')
+    cache = util.AssetCache(idir, callback)
+    app = Flask(__name__)
 
-    try:
-        keyring.set_password('zwi.py', name, password)
-    except keyring.errors.PasswordSetError:
-        raise SystemExit('Cannot set zwi.py username+password')
+    @app.route('/<req>')
+    def root(req):
+        print(f'root: {req=}')
+        return escape(req)
 
-    try:
-        if keyring.get_password('zwi.py', 'username') != name:
-            raise SystemExit('keyring username mismatch')
+    @app.route('/images/<img>')
+    def images(img):
+        print(f'images: {escape(img)}')
+            
+        try:
+            fna = cache.load('https://static-cdn.zwift.com/prod/profile/' + img, {})
+            if fna:
+                print(f'cache.load: => {fna}')
+                return flask.send_file(fna,
+                                       as_attachment=False,
+                                       download_name=f'{img}.jpg',
+                                       mimetype='image/jpeg')
+            else:
+                return flask.redirect('https://static-cdn.zwift.com/prod/profile/' + img, code=307)
+        except Exception as ex:
+            print(f'/images/{escape(img)}: {ex=}')
+            return flask.Response(f'/images/{escape(img)}: {ex=}')
+        pass
 
-        if keyring.get_password('zwi.py', name) != password:
-            raise SystemExit('keyring password mismatch')
+    app.run()
 
-        sys.exit(0)
-    except keyring.errors.KeyringError as e:
-        raise SystemExit('***keyring error:', e)
-    pass
-
+    return 0
 
 @cli.command()
 def check():
     """Verify that we have established the authentication."""
-    (cl, pr) = zwi_init()
-    sys.exit(0)
-    pass
+    return util.check()
 
 
 @cli.command()
 def clear():
     """Clear out any saved authentication information."""
-
-    try:
-        name = keyring.get_password('zwi.py', 'username')
-    except keyring.errors.KeyringError as e:
-        raise SystemExit('***keyring error:', e)
-
-    try:
-        keyring.delete_password('zwi.py', name)
-    except keyring.errors.KeyringError as e:
-        raise SystemExit('Trying to delete password: ***keyring error:', e)
-
-    try:
-        keyring.delete_password('zwi.py', 'username')
-    except keyring.errors.KeyringError as e:
-        raise SystemExit('Trying to delete username: ***keyring error:', e)
-
-    return sys.exit(0)
+    return util.clear()
 
 
 @cli.command()
 def wees():
     """Display followees who are not following me."""
-    followees()
-    return sys.exit(0)
+    return followees()
 
 
 @cli.command()
 def wers():
     """Display followers who I am not following."""
-    followers()
-    return sys.exit(0)
-
-
-def zwi_init():
-    """Initialise communications with Zwift API."""
-
-    try:
-        name = keyring.get_password('zwi.py', 'username')
-    except Exception as e:
-        print('Error:', e)
-        raise SystemExit(f'{e!r}: Cannot locate `username` entry -- re-run `auth`.')
-
-    if name is None:
-        raise SystemExit('Error: no `username` has been specified -- re-run `auth`.')
-
-    try:
-        password = keyring.get_password('zwi.py', name)
-    except Exception as e:
-        print('Error:', e)
-        raise SystemExit(f'{e!r} Cannot locate `password` entry for user {name} -- re-run `auth`.')
-
-    try:
-        cl = Client(name, password)
-        pr = cl.get_profile()
-        pr.check_player_id()
-        print('player_id:', pr.player_id)
-        return cl, pr
-    except Exception as e:
-        print('Error:', e)
-        raise SystemExit('Authentication failure for user {name}.')
-    pass
-
+    return followers()
 
 def followees():
     count = 0
@@ -203,7 +123,7 @@ def followees():
         count += 1
         boo = (d['followeeStatusOfLoggedInPlayer'] != d['followerStatusOfLoggedInPlayer'])
 
-        if verbosity > 0:
+        if util.verbo_p(1):
             # dump out entire list
             print('{:4d}{}{} {}\t{} {}'.format(count, [' ', '*'][boo]
                                                , d['followeeStatusOfLoggedInPlayer']
@@ -229,7 +149,7 @@ def followers():
         count += 1
         boo = (d['followeeStatusOfLoggedInPlayer'] != d['followerStatusOfLoggedInPlayer'])
 
-        if verbosity > 0:
+        if util.verbo_p(1):
             print('{:4d}{}{} {}\t{} {}'.format(count, [' ', '*'][boo]
                                                , d['followeeStatusOfLoggedInPlayer']
                                                , d['followerStatusOfLoggedInPlayer']
@@ -274,555 +194,131 @@ def csv(wers, wees):
     pass
 
 
-class DataBase(object):
-    cache = {}  # DB universe
-
-    def __init__(self, path=None, reset=False):
-        self._path = path = DataBase.db_path(path)
-        self._cur = None
-
-        debug(2, f'init {self=} {self._path=} {DataBase.cache=}')
-
-        if path in DataBase.cache:
-            if reset:
-                del DataBase.cache[path]
-            else:
-                raise Error(f'Programming error: {path} already exists in cache.')
-            pass
-
-        self._db = DataBase.__db_connect(path, reset)
-        super().__init__()
-
-        DataBase.cache[path] = self
-        pass
-
-    def __del__(self):
-        debug(2, f'del {self=} {self._path=} {DataBase.cache=}')
-        if self._path in DataBase.cache:
-            del DataBase.cache[self._path]
-            pass
-
-    @staticmethod
-    def db_path(path=None):
-        """Return the path name."""
-        if path is None:
-            zdir = os.getenv('HOME') + '/.zwi/'
-            path = zdir + 'zwi.db'
-            if not os.path.isdir(zdir):
-                try:
-                    os.mkdir(zdir)
-                except Exception as e:
-                    print(f'Cannot create database directory: {zdir}')
-                    print(f'{e}')
-                    raise SystemExit(f'Cannot create {zdir}')
-                pass
-            pass
-        return path
-
-    @staticmethod
-    def __db_connect(path, reset=False):
-        """Setup DB for access."""
-
-        if reset and os.path.isfile(path):
-            try:
-                os.remove(path)
-            except Exception as e:
-                # print(f'Error: {e}')
-                raise e
-            pass
-
-        if reset or path not in DataBase.cache:
-            try:  # first, try to create the DB
-                db = sq.connect(path)
-            except Exception as e:
-                raise e
-            DataBase.cache[path] = db
-            pass
-        return DataBase.cache[path]
-
-    @classmethod
-    def db_connect(cls, path=None, reset=False, drop=False):
-        """Connect to a database."""
-        path = cls.db_path(path)
-        if path not in cls.cache:
-            return DataBase(path, reset)
-        else:
-            return cls.cache[path]
-        pass
-
-    @property
-    def db(self):
-        return self._db
-
-    @property
-    def path(self):
-        return self._path
-
-    @property
-    def cursor(self):
-        if not self._cur:
-            self._cur = self._db.cursor()
-        return self._cur
-
-    def table_exists(self, name):
-        """Query if table exists in DB."""
-        sel = f'''SELECT name FROM sqlite_master WHERE type='table' AND name='{name}';'''
-        res = self.execute(sel)
-        for tup in res.fetchall():
-            # print(f'{type(tup)=} {isinstance(tup, tuple)=}')
-            if isinstance(tup, tuple):
-                for t in tup:
-                    if t == name:
-                        debug(2, f'{res=} {tup=} {t=} {t==name=}')
-                        return True
-                    pass
-                pass
-            pass
-        debug(2, f'{res=} {name in res=}')
-        return False
-
-    def execute(self, exe):
-        debug(2, f'{exe}')
-        try:
-            return self.cursor.execute(exe)
-        except Exception as e:
-            debug(2, f'{exe}')
-            raise Error(f'execute({exe} => {e}')
-        pass
-
-    def drop_table(self, name):
-        self.execute(f'DROP TABLE IF EXISTS {name};')
-        return
-
-    def create_table(self, name, cols):
-        exe = f"CREATE TABLE IF NOT EXISTS {name}({', '.join(cols)});"
-        self.execute(exe)
-        return
-
-    def row_insert(self, name, cols, vals):
-        debug(2, f'{cols=}')
-        debug(2, f'{vals=}')
-        exe = f'''INSERT INTO {name} ({', '.join(cols)}) VALUES({', '.join(vals)});'''
-        self.execute(exe)
-        self.commit()
-        return
-
-    def table_rows(self, name, cols, arraysize=200):
-        """Return a generator for the specified rows in the named table."""
-        sel = ', '.join(f'{a}' for a in cols)
-        r = self.execute(f'SELECT {sel} FROM {name} ORDER BY rowid')
-
-        def gen():
-            while True:
-                ar = r.fetchmany(arraysize)
-
-                if not ar:
-                    break
-                for e in ar:
-                    yield e
-                    pass
-                pass
-            pass
-
-        return gen
-
-    def commit(self):
-        return self.db.commit()
-
-    def close(self):
-        self._cur.close()
-        del self._cur
-        self._cur = None
-        self._db.close()
-        del self._db
-        self._db = None
-
-    pass
-
-
-class ZwiBase(object):
-    """base class for Zwi @dataclass objects."""
-
-    def traverse(self, fun, arg):
-        """traverse structure built by the default __init__."""
-        for x in fields(self):
-            if x.type in (int, str, bool):
-                fun(self, x, arg)
-            elif isinstance(x.type(), ZwiBase):
-                fun(self, x, arg)
-                pass
-            pass
-        return arg
-
-    @staticmethod
-    def from_dict(f, x, arg):
-        """Assign values from a supplied dict()."""
-        if x.name in arg:
-            debug(2, f'{x.name=} {x.type=} {arg[x.name]=}')
-            if x.type in (int, bool):
-                setattr(f, x.name, arg[x.name])
-            elif x.type is str:
-                setattr(f, x.name, arg[x.name])
-            elif isinstance(x.type(), ZwiBase):
-                # we expect that f.<value> here is a suitable dict
-                f0 = getattr(f, x.name)
-                if f0 is not None and x.name in arg:
-                    debug(2, f'dict: {f0=} {arg[x.name]=}')
-                    f0.traverse(ZwiBase.from_dict, arg[x.name])
-                else:
-                    raise SystemExit(f'oops')
-                pass
-            else:
-                raise SystemExit(f'Unexpected type: {x.type=}')
-            pass
-        return arg
-
-    @staticmethod
-    def to_dict(f, x, arg):
-        """Assing values to a supplied dict().
-        Does not construct the dict or add any missing fields."""
-        if x.name in arg:
-            # print(f'{x.name=} {x.type=} {arg[x.name]=}')
-            if x.type in (int, bool):
-                arg[x.name] = getattr(f, x.name)
-            elif x.type is str:
-                arg[x.name] = getattr(f, x.name)
-            elif isinstance(x.type(), ZwiBase):
-                # we expect that self.<value> here is a suitable dict
-                f0 = getattr(f, x.name)
-                if f0 is not None:
-                    debug(2, f'dict: {f0=} {arg[x.name]=}')
-                    f0.traverse(f.to_dict, arg[x.name])
-                    pass
-                pass
-            else:
-                raise SystemExit(f'Unexpected type: {x.type=}')
-            pass
-        return arg
-
-    @staticmethod
-    def from_seq(f, x, arg):
-        """Assign values from a sequence.
-        We perform a depth-first traversal, and pop successive values from the sequence."""
-        # print(f'{x.name=} {x.type=}')
-        if x.type in (int, bool):
-            setattr(f, x.name, arg.pop())
-        elif x.type is str:
-            setattr(f, x.name, arg.pop())
-        elif isinstance(x.type(), ZwiBase):
-            # decide what we need the recursion to do:
-            f0 = getattr(f, x.name)
-            debug(2, f'from_seq: {x.name=} {f0}')
-            if f0 is not None:
-                f0.traverse(f0.from_seq, arg)
-                pass
-            raise SystemExit('logic error')
-        else:
-            raise SystemExit(f'Unexpected type: {x.type=}')
-        return arg
-
-    pass
-
-
-@dataclass
-class ZwiFollowers(ZwiBase):
-    followerId: int = 0
-    followeeId: int = 0
-    status: str = ''
-    isFolloweeFavoriteOfFollower: bool = False
-
-    @dataclass
-    class FollowerProfile(ZwiBase):
-        publicId: str = ''
-        firstName: str = ''
-        lastName: str = ''
-        male: bool = True
-        imageSrc: str = ''
-        imageSrcLarge: str = ''
-        playerType: str = ''
-        countryAlpha3: str = ''
-        countryCode: int = 0
-        useMetric: bool = True
-        riding: bool = False
-
-        @dataclass
-        class Privacy(ZwiBase):
-            approvalRequired: bool = False
-            displayWeight: bool = False
-            minor: bool = False
-            privateMessaging: bool = False
-            defaultFitnessDataPrivacy: bool = False
-            suppressFollowerNotification: bool = False
-            displayAge: bool = True
-            defaultActivityPrivacy: str = ''
-
-            pass
-
-        privacy: Privacy = Privacy()
-
-        @dataclass
-        class SocialFacts(ZwiBase):
-            followersCount: int = 0
-            followeesCount: int = 0
-            followeesInCommonWithLoggedInPlayer: int = 0
-            followerStatusOfLoggedInPlayer: str = ''
-            followeeStatusOfLoggedInPlayer: str = ''
-            isFavoriteOfLoggedInPlayer: bool = True
-            pass
-
-        socialFacts: SocialFacts = SocialFacts()
-        worldId: int = 0
-        enrolledZwiftAcademy: bool = False
-        playerTypeId: int = 0
-        playerSubTypeId: int = 0
-        currentActivityId: int = 0
-        likelyInGame: bool = False
-        pass
-
-    profile: FollowerProfile = FollowerProfile()
-
-    addDate: str = f'''{datetime.now().isoformat(timespec='minutes')}'''
-    delDate: str = 'not yet'
-
-    @classmethod
-    def wers(cls, data):
-        """Init a followers-type entry."""
-
-        if isinstance(data, dict):
-            # assumed to be per the Zwift format.
-            assert 'followerProfile' in data
-            data['profile'] = data['followerProfile']
-            e = ZwiFollowers()
-            e.traverse(ZwiBase.from_dict, data)
-            return e
-        raise Exception(f'funny type of {data!r}')
-
-    @classmethod
-    def wees(cls, data):
-        """Init a followees-type entry."""
-
-        if isinstance(data, dict):
-            # assumed to be per the Zwift format.
-            assert 'followeeProfile' in data
-            data['profile'] = data['followeeProfile']
-            e = ZwiFollowers()
-            e.traverse(ZwiBase.from_dict, data)
-            return e
-        raise Exception(f'funny type of {data!r}')
-
-    @classmethod
-    def column_names(cls, pk='', create=False):
-        """generate the columnt list for a DB create."""
-        tmap = {int: 'INT', bool: 'INT', str: 'TEXT'}
-
-        def fun(f, x, arg):
-            """Function to enumerate the column names."""
-            if x.type in (int, bool, str):
-                if not create:  # INSERT/SELECT usage
-                    arg.append(f'{x.name}')  # .. no type
-                elif x.name == pk:  # CREATE and PRIMARY
-                    arg.append(f'{x.name} {tmap[x.type]} PRIMARY KEY')
-                else:  # CREATE, no PRIMARY
-                    arg.append(f'{x.name} {tmap[x.type]}')
-            elif isinstance(x.type(), ZwiBase):
-                f0 = getattr(f, x.name)
-                if f0 is not None:
-                    f0.traverse(fun, arg)
-                    pass
-                pass
-            pass
-
-        return cls().traverse(fun, list())
-
-    def column_values(self):
-        """generate the values list for a DB insert."""
-        def fun(f, x, arg):
-            """Function to enumerate the column values."""
-            val = getattr(f, x.name)
-
-            if x.type in (int, bool):
-                if val is None:
-                    val = 0
-                else:
-                    val = int(val)
-                    pass
-                arg.append(f'{val}')
-            elif x.type is str:
-                # We need to replace all single ' with double ''
-                val = str(val).replace("'", "''")
-                arg.append(f"'{val}'")
-            elif isinstance(x.type(), ZwiBase):
-                f0 = getattr(f, x.name)
-                if f0 is not None:
-                    f0.traverse(fun, arg)
-                    pass
-                pass
-            pass
-        return self.traverse(fun, list())
-    pass
-
-
-def get_zdir(xtra=''):
-    """Establish local Zwi directory."""
-
-    zdir = os.getenv('HOME') + '/.zwi/' + xtra
-    if not os.path.isdir(zdir):
-        try:
-            os.mkdir(zdir)
-        except Exception as e:
-            print(f'Cannot create zwi directory: {zdir}')
-            print(f'{e}')
-            raise SystemExit(f'Cannot create {zdir}')
-        pass
-    return zdir
-
-
-class ZwiUser(object):
-    """Zwift user model."""
-
-    def __init__(self, db=None, drop=False, update=False):
-        self._db = db
-        self._wers = []
-        self._wees = []
-        self._cols = ZwiFollowers.column_names()
-        self._cl = None
-        self._pr = None
-        self._setup(drop, update)
-        pass
-
-    @property
-    def cols(self):
-        return self._cols
-
-    @property
-    def wees(self):
-        return self._wees
-
-    @property
-    def wers(self):
-        return self._wers
-    
-    def _setup(self, drop, update):
-        """Syncronise with the local DB version of the world."""
-        if self._db is None:  # attach to the usual DB
-            self._db = DataBase.db_connect()
-            pass
-
-        if drop:
-            self._db.drop_table('followers')
-            self._db.drop_table('followees')
-            self._db.drop_table('enum')  # XXX: not here
-            pass
-
-        self._db.create_table('followers', ZwiFollowers.column_names(create=True, pk='followerId'))
-        self._db.create_table('followees', ZwiFollowers.column_names(create=True, pk='followeeId'))
-
-        if update:  # update from Zwift?
-            self.update('followers', self.wers_fac)
-            self.update('followees', self.wees_fac)
-            pass
-
-        self._slurp(self._wers, 'followers')
-        self._slurp(self._wees, 'followees')
-        pass
-
-    def _slurp(self, cache, tab):
-        """Slurp in the table data."""
-        g = self._db.table_rows(tab, self._cols)
-        count = 0
-        for r in g():
-            cache.append(r)
-            count = count + 1
-            if count <= 10 and verbosity >= 2:
-                verbo(3, f'{r=}')
-            elif verbosity >= 1:
-                print(f'\rslurped {tab}: {count}', end='')
-                pass
-            pass
-        verbo(1, '')
-        pass
-
-    def update(self, tab, factory):
-        if self._pr is None:
-            self._cl, self._pr = zwi_init()
-            pass
-
-        vec = []
-        start = 0
-        while True:
-            fe = self._pr.request.json(f'/api/profiles/{self._pr.player_id}/{tab}?start={start}&limit=200')
-            if len(fe) == 0:
-                break
-
-            for f in fe:
-                start += 1
-                vec.append(f)
-                pass
-            if verbosity >= 1:
-                print(f'\rprocessed {tab}: {start}', end='')
-                pass
-            pass
-        verbo(1, '')
-
-        # I want to add these into the DB in historical order.
-        # It appears that more recent followers are returned first above.
-        vec.reverse()
-
-        start = 0
-        for v in vec:
-            w = factory(v)
-            self._db.row_insert(tab, w.column_names(), w.column_values())
-            start += 1
-            if verbosity >= 1:
-                print(f'\rprocessed {tab}: {start}', end='')
-                pass
-            pass
-        verbo(1, '')
-        return
-
-    def wers_fac(self, v):
-        o = ZwiFollowers.wers(v)
-        self._wers.append(o)
-        return o
-
-    def wees_fac(self, v):
-        o = ZwiFollowers.wees(v)
-        self._wees.append(o)
-        return o
-
-    pass
-
-
-@cli.command()
-def test():
-    """Perform some modicum of internal tests."""
-    try:
-        raise Exception('yo!')
-    except Exception as e:
-        print(f'{e!r}: oops!')
-        pass
-
-    db0 = DataBase.db_connect()
-    db1 = DataBase.db_connect('/tmp/zwi_test.db', reset=True)
-    db2 = DataBase.db_connect('/tmp/zwi_test.db', reset=True)
-    db3 = DataBase.db_connect()
-
-    assert db0 == db3
-    assert db2 != db3
-
-    print(f"{db1=} {db1.table_exists('followers')=}")
-    print(f"{db1=} {db1.table_exists('followees')=}")
-
-    db1.close()
-    pass
-
-
 @cli.command()
 def reset():
     """Reset the database, refresh followers/followees data."""
     db = DataBase.db_connect(reset=True)
     ZwiUser(db, update=True)
+    ZwiPro().update(force=True)
 
+    return 0
+
+
+@cli.command()
+def update():
+    """Update user's follower/follee DB cache."""
+    ZwiUser(update=True)
+    ZwiPro().update(force=True)
+
+    return 0
+
+@dataclass
+class ProPrinter():
+    line_cnt: int = 0  # output line count
+
+    def out(self, p, prefix=' '):
+        self.line_cnt += 1
+        if self.line_cnt % 32 == 1:
+            print((' ' +
+                  '{0:18.18s} {1:>8.8s} {2:>4.4s} ' +
+                  '{3:>5.5s} ' +
+                  '{4:>6.6s} ' +
+                  '{5:>8.8s} ' +
+                  '{6:>8.8s} ' +
+                  '{7:16.16s} ' +
+                  '{8:s}').format(
+                      'date',
+                      'ZwiftID',
+                      'FTP',
+                      'level',
+                      'hours',
+                      'distance',
+                      'climbed',
+                      'bike',
+                      'name'))
+            pass
+        print(prefix +
+              f'{p.addDate:18.18s} {p.id:8d} {p.ftp:4d} ' +
+              f'{p.achievementLevel/100.0:5.2f} ' +
+              f'{p.totalTimeInMinutes//60:6d} ' +
+              f'{p.totalDistance:8d} ' +
+              f'{p.totalDistanceClimbed:8d} ' +
+              f'{p.virtualBikeModel:16.16s} ' +
+              f'{p.firstName} {p.lastName}')
+        pass
+    pass
+
+@cli.command()
+@click.option('--force', is_flag=True, help='Force refresh.')
+def pro_update(force):
+    """Update the profile DB based on user's follower/followee DB cache."""
+    usr = ZwiUser()
+    pro = ZwiPro()
+    pr = ProPrinter()
+
+    for r in usr.wers:
+        d = dict(zip(usr.cols, r))
+        new = pro.update(zid=d['followerId'], force=force)
+        if util.verbo_p(1) and new:
+            pr.out(new)
+        pass
+
+    for r in usr.wees:
+        d = dict(zip(usr.cols, r))
+        new = pro.update(zid=d['followeeId'], force=force)
+        if util.verbo_p(1) and new:
+            pr.out(new)
+        pass
+
+    return 0
+
+        
+@cli.command()
+def pro_list():
+    """List profile DB contents."""
+
+    pro = ZwiPro()
+    pr = ProPrinter()
+
+    for p in ZwiPro():
+        pr.out(p)
+        pass
+    return 0
+
+@cli.command()
+@click.option('--skip', help='skip over the first N profile entries')
+@click.option('--zid', help='update just the profile entry for the given Zwift ID')
+@click.option('--seek', help='seek into the list of entries up to the specified Zwift ID')
+def pro_refresh(skip, zid, seek):
+    """Refresh local profile DB from Zwift."""
+    skip = 0 if skip is None else int(skip)
+
+    pro = ZwiPro()
+    pr = ProPrinter()
+
+    for p in pro:
+        if skip > 0:
+            skip -= 1
+            continue
+
+        if zid is not None and int(zid) != int(p.id):
+            continue
+        if seek is not None and int(seek) != int(p.id):
+            continue
+
+        q = p.update(pro)
+        pr.out(p)
+        if q is None:
+            # Sometimes the update fails.
+            print(f'skipping {p.id}')
+        elif p is not q and p != q:
+            pr.out(q, prefix='*')
+            util.verbo(1, f'{p.last_difference}')
+            pass
+
+        if zid: break
+        if seek: seek = None
+        pass
     return 0
 
 
@@ -847,7 +343,7 @@ def gui():
                                      QGraphicsScene,
                                      QStyleOptionViewItem)
     except Exception as e:
-        print('import error', e)
+        print('import error:', e)
         print('pip3 install pyqt5')
         sys.exit(1)
         pass
@@ -858,9 +354,7 @@ def gui():
         Ui_MainWindow, QtBaseClass = uic.loadUiType(sfile)
     except Exception as e:
         print(f'{e}')
-        print(f"Can't find GUI script file: {sfile}.")
-        sys.exit(1)
-        pass
+        raise SystemExit(f"Can't find GUI script file: {sfile}.")
 
     class ImageCache(QRunnable):
         def __init__(self, sig):
@@ -1302,10 +796,63 @@ def gui():
     sys.exit(app.exec_())
     pass
 
+
+@cli.command()
+def devel():
+    """more development staging...."""
+
+    usr = ZwiUser()
+    pro = ZwiPro()
+
+    # pro.update(pr.player_id)
+
+    count = 0
+    for r in usr.wees:
+        d = dict(zip(usr.cols, r))
+        pro.update(d['followeeId'])
+        if util.verbo_p(0):
+            print(f'''\rprocessed {d['followeeId']}: {count}''', end='')
+            pass
+        count += 1
+        pass
+    util.verbo(0, '')
+
+    count = 0
+    for r in usr.wers:
+        d = dict(zip(usr.cols, r))
+        pro.update(d['followerId'])
+        if util.verbo_p(0):
+            print(f'''\rprocessed {d['followerId']}: {count}''', end='')
+            pass
+        count += 1
+        pass
+    util.verbo(0, '')
+
+    # see if I can get follower[0]'s followee list
+    # print(f'uid={usr.wers[0][0]}')
+    # usr0 = ZwiUser(uid=usr.wers[0][0], update=True, pro_update=True)
+    util.setup(1, util.util.debug_lvl)
+    
+    count = 0
+    for r in pro._pro:
+        d = dict(zip(pro.cols, r))
+        if d['id'] == 1277086:
+            continue
+
+        print(f'{d["id"]}')
+        ZwiUser(uid=d['id'], update=True, pro_update=pro)
+        if util.verbo_p(1):
+            print(f'''processed {d['id']}: {count}''')
+            pass
+        count += 1
+        pass
+    pass
+
     
 def keyboardInterruptHandler(signal, frame):
     print("KeyboardInterrupt (signal: {}) has been caught. Cleaning up...".format(signal))
-    exit(0)
+    sys.exit(0)
+
 
 # XXX: This works, but not entirely.
 # I find I have to interact with the GUI to get it to fire
@@ -1318,8 +865,9 @@ if __name__ == '__main__':
         cli()
         sys.exit(0)
     except Exception as e:
-        debug(2, f'{type(e)=}\n{e!r}')
+        util.debug(2, f'{type(e)=}\n{e!r}')
         print(f'{e}')
-        if debug_lvl > 0:
+        if util.debug_p(0):
             raise Exception('oops!') from e
         sys.exit(1)
+    pass
