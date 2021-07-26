@@ -76,6 +76,13 @@ The `pro-update` function will update the local DB profile cache using informati
     ./zwi.py pro-list
 
 
+## bokeh
+
+    bokeh serve --show ./zwibok.py
+
+The `profile` database can be viewed using the `zwibok` app.
+This all needs to be rewritten soon, but is is somewhat functional.
+
 ## Gui
 
     ./zwi.py gui --help
