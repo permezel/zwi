@@ -1,7 +1,7 @@
 [![logo](https://raw.githubusercontent.com/permezel/zwi/master/logo.png)](https://zwift.com/)
 # zwi
 
-This is a small python programme to facilitate viewing Zwift data.
+Here are some small python programmes to facilitate viewing Zwift data.
 
 # Requirements
 
