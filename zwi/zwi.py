@@ -348,7 +348,8 @@ def gui():
                     # XXX: what about if it is blocked on a semaphore?
                     self._terminate = True
                     print('waiting for thread to terminate....')
-                    time.sleep(1)
+                    self._mux.unlock()
+                    time.sleep(5)
                 else:
                     self._mux.unlock()
                     return
