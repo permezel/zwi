@@ -130,6 +130,10 @@ def ic_callback(cache):
 #
 icache = util.AssetCache(get_zdir('.image-cache'), ic_callback)
 
+# XXXXXXXXXXXXXXXXXXXXXXXXX
+# This does not work. I need to run a local WEB server to
+# serve these files.
+# XXXXXXXXXXXXXXXXXXXXXXXXX
 def ic_lookup(url, df):
     rv = icache.load(url, df)
     if rv is None:
@@ -174,10 +178,11 @@ df['achievementLevel'] = df['achievementLevel'].apply(lambda x: int(x) // 100)
 df['weight'] = df['weight'].apply(lambda x: int(x) // 1000)
 df['height'] = df['height'].apply(lambda x: int(x) // 10)
 df['totalDistance'] = df['totalDistance'].apply(lambda x: int(x) // 1000)
-df['imageSrc'] = df['imageSrc'].apply(lambda x: ic_lookup(x, df))
-print(df['imageSrc'])
-
-# sys.exit(0)
+if False:
+    # XXXXXXXx not working yet
+    df['imageSrc'] = df['imageSrc'].apply(lambda x: ic_lookup(x, df))
+    print(df['imageSrc'])
+    pass
 
 sliders = {}
 # Set up layouts and add to document
