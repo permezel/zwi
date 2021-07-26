@@ -36,63 +36,6 @@ def auth(name, password):
 
 
 @cli.command()
-def flask_test():
-    """Test using flask to serve the image cache."""
-    return 0
-    
-    
-@cli.command()
-def test():
-    """Test some things...."""
-    import flask
-    from flask import Flask, redirect, send_file
-    from markupsafe import escape
-    
-    def process(self, wrk):
-        """Process completed URL fetch."""
-        print(f'process: {wrk=}')
-        url = wrk[0]
-        pass
-    
-    def callback(cache):
-        """This callback is called in the worker thread."""
-        print(f'callback: {cache=}')
-        cache.update(process)
-        pass
-
-    idir = get_zdir('.image-cache')
-    cache = util.AssetCache(idir, callback)
-    app = Flask(__name__)
-
-    @app.route('/<req>')
-    def root(req):
-        print(f'root: {req=}')
-        return escape(req)
-
-    @app.route('/images/<img>')
-    def images(img):
-        print(f'images: {escape(img)}')
-            
-        try:
-            fna = cache.load('https://static-cdn.zwift.com/prod/profile/' + img, {})
-            if fna:
-                print(f'cache.load: => {fna}')
-                return flask.send_file(fna,
-                                       as_attachment=False,
-                                       download_name=f'{img}.jpg',
-                                       mimetype='image/jpeg')
-            else:
-                return flask.redirect('https://static-cdn.zwift.com/prod/profile/' + img, code=307)
-        except Exception as ex:
-            print(f'/images/{escape(img)}: {ex=}')
-            return flask.Response(f'/images/{escape(img)}: {ex=}')
-        pass
-
-    app.run()
-
-    return 0
-
-@cli.command()
 def check():
     """Verify that we have established the authentication."""
     return util.check()
@@ -797,7 +740,8 @@ def gui():
     pass
 
 
-@cli.command()
+# disable this ...
+# @cli.command()
 def devel():
     """more development staging...."""
 
@@ -849,6 +793,65 @@ def devel():
     pass
 
     
+# disable this ...
+# @cli.command()
+def flask_test():
+    """Test using flask to serve the image cache."""
+    return 0
+    
+    
+# disable this ...
+# @cli.command()
+def test():
+    """Test some things...."""
+    import flask
+    from flask import Flask, redirect, send_file
+    from markupsafe import escape
+    
+    def process(self, wrk):
+        """Process completed URL fetch."""
+        print(f'process: {wrk=}')
+        url = wrk[0]
+        pass
+    
+    def callback(cache):
+        """This callback is called in the worker thread."""
+        print(f'callback: {cache=}')
+        cache.update(process)
+        pass
+
+    idir = get_zdir('.image-cache')
+    cache = util.AssetCache(idir, callback)
+    app = Flask(__name__)
+
+    @app.route('/<req>')
+    def root(req):
+        print(f'root: {req=}')
+        return escape(req)
+
+    @app.route('/images/<img>')
+    def images(img):
+        print(f'images: {escape(img)}')
+            
+        try:
+            fna = cache.load('https://static-cdn.zwift.com/prod/profile/' + img, {})
+            if fna:
+                print(f'cache.load: => {fna}')
+                return flask.send_file(fna,
+                                       as_attachment=False,
+                                       download_name=f'{img}.jpg',
+                                       mimetype='image/jpeg')
+            else:
+                return flask.redirect('https://static-cdn.zwift.com/prod/profile/' + img, code=307)
+        except Exception as ex:
+            print(f'/images/{escape(img)}: {ex=}')
+            return flask.Response(f'/images/{escape(img)}: {ex=}')
+        pass
+
+    app.run()
+
+    return 0
+
 def keyboardInterruptHandler(signal, frame):
     print("KeyboardInterrupt (signal: {}) has been caught. Cleaning up...".format(signal))
     sys.exit(0)
