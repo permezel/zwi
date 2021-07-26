@@ -108,13 +108,12 @@ class AssetCache(object):
         while True:
             self._mux.acquire()
             if self._nthreads > 0:
-                # XXX: what about if it is blocked on a semaphore?
                 self._terminate = True
                 print('waiting for thread to terminate....')
-                time.sleep(1)
             else:
                 self._mux.release()
                 return
+            self._mux.release()
             pass
         pass
 
