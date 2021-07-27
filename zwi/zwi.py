@@ -198,19 +198,40 @@ def pro_update(force):
     usr = ZwiUser()
     pro = ZwiPro()
     pr = ProPrinter()
+    done = []
+
+    def update(zid, force):
+        old = pro.lookup(zid)
+        new = pro.update(zid, force=force)
+        if util.verbo_p(1):
+            if old is not None:
+                pr.out(old)
+                pass
+            if new is None:
+                if force:   # Sometimes the update fails.
+                    print(f'skipping {zid}')
+                    pass
+                pass
+            elif old is None or old is not new and  old != new:
+                pr.out(new, prefix='*')
+                if old is not None:
+                    util.verbo(2, f'{old.last_difference}')
+                    pass
+                pass
+            pass
+        pass
 
     for r in usr.wers:
         d = dict(zip(usr.cols, r))
-        new = pro.update(zid=d['followerId'], force=force)
-        if util.verbo_p(1) and new:
-            pr.out(new)
+        update(d['followerId'], force)
+        done.append(d['followerId'])
         pass
 
     for r in usr.wees:
         d = dict(zip(usr.cols, r))
-        new = pro.update(zid=d['followeeId'], force=force)
-        if util.verbo_p(1) and new:
-            pr.out(new)
+        if d['followeeId'] in done:
+            continue
+        update(d['followeeId'], force)
         pass
 
     return 0
