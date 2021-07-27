@@ -160,8 +160,8 @@ def pro_to_df(pro, want):
     return pd.DataFrame(res)
 
 df = pro_to_df(pro, col)
-debug(2, df)
-debug(2, df.query('20 <= age and age < 21'))
+# debug(2, df)
+# debug(2, df.query('20 <= age and age < 21'))
 #
 # adjust some values
 #
@@ -442,33 +442,35 @@ def filter_chk(df, slid_key):
 
 TOOLTIPS = """
     <div>
-        <div>
+      <table>
+        <tr>
+         <td>
+          <div>
             <img
                 src="@imageSrc" height="128" alt="@imageSrc" width="128"
 		style="float: left; margin: 0px 15px 15px 0px;"
                 border="2"
             ></img>
-        </div>
-        <div>
+          </div>
+        </td>
+        <td>
+          <div>
             <span style="font-size: 17px; font-weight: bold;">@firstName</span>
             <span style="font-size: 17px; font-weight: bold;">@lastName</span>
-        </div>
-        <div>
-            <span style="font-size: 15px;">age:</span>
-            <span style="font-size: 10px; color: #696;">@age</span>
-        </div>
-        <div>
-            <span style="font-size: 15px;">weight:</span>
-            <span style="font-size: 10px; color: #696;">@weight</span>
-        </div>
-        <div>
-            <span style="font-size: 15px;">height:</span>
-            <span style="font-size: 10px; color: #696;">@height</span>
-        </div>
-        <div>
-            <span style="font-size: 15px;">ftp:</span>
-            <span style="font-size: 10px; color: #696;">@ftp</span>
-        </div>
+          </div>
+
+          <div>
+            <span style="font-size: 10px; color: #696;">@age yo</span>
+            <span style="font-size: 10px; color: #696;">@weight kg</span>
+            <span style="font-size: 10px; color: #696;">@height cm</span>
+            <span style="font-size: 10px; color: #696;">@ftp w</span>
+          </div>
+          <div>
+            <span style="font-size: 10px; color: #696;">@country</span>
+          </div>
+        </td>
+      </tr>
+      </table>
     </div>
 """
 
@@ -520,25 +522,14 @@ def xy_plot_update(df, fig=None, source=None, male_glyph=None, fema_glyph=None):
 
         if fig is None:
             hov = HoverTool(tooltips=None)
-            hov.tooltips = [
-                ("index", "$index"),
-                ("(x,y)", "($x, $y)"),
-                ("first", "@firstName"),
-                ("last", "@lastName"),
-                ("ftp", "@ftp"),
-                ("age", "@age"),
-                ("weight", "@weight"),
-                ("country", "@countryAlpha3"),
-                ("image", "@imageSrc"),
-            ]
             hov.tooltips = TOOLTIPS
 
             fig = figure(title=f'{x}::{y}',
                          x_axis_label=x,
                          y_axis_label=y,
-                         tools=[hov, 'crosshair', 'box_zoom', 'lasso_select'],
-                         active_drag='lasso_select',                        
-                         sizing_mode='stretch_width', max_width=2560, plot_height=1024)
+                         tools=[hov, 'crosshair', 'box_zoom', 'reset'],
+                         # active_drag='box_zoom',                        
+                         sizing_mode='stretch_width', max_width=2560, plot_height=1024, plot_width=1280)
 
             male_glyph = fig.circle(source=source,
                                     view=vmale,
