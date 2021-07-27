@@ -1068,6 +1068,14 @@ class ZwiPro(object):
         if count: verbo(1, '')
         pass
 
+    def lookup(self, zid):
+        if zid in self._lookup:
+            rv = self._pro[self._lookup[zid]]
+            if isinstance(rv, tuple):
+                return ZwiProfile.from_seq(rv)
+            return rv
+        return None
+
     def update(self, zid=None, force=False):
         """Update the profile for `zid` if not currently in the DB.
         If force is set, we update regardless."""
