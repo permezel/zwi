@@ -25,20 +25,20 @@ Here are some small python programmes to facilitate viewing Zwift data.
 
 # Usage
 
-    ./zwi.py --help
+    ./zwi --help
 
 ## Authentication
 
-    ./zwi.py auth --help
-    ./zwi.py auth
+    ./zwi auth --help
+    ./zwi auth
 
 The `auth` function will store the Zwift login credentials in the system keychain.
 Once authentication has been established, the login credentials need not be passed on each invocation.
 
 ## Verification
 
-    ./zwi.py check --help
-    ./zwi.py check
+    ./zwi check --help
+    ./zwi check
 
 The `check` function will verify that the stored credentials function.
 On `MacOS`, normally, you will not have to enter the login password each time.
@@ -49,44 +49,44 @@ However, whenever the `python` interpreter changes, you will have to do so twice
 `zwi` maintains state in `${HOME}/.zwi/`.  An `sqlite3` database is used to cache the state of the user's `followers` and `followees` lists.
 In addition, the profiles of all Zwift users encountered (via the `followers`/`followees` lists) are saved in a separate database.
 
-    ./zwi.py reset --help
-    ./zwi.py reset
+    ./zwi reset --help
+    ./zwi reset
 
 The `reset` function deletes the `${HOME}/.zwi/zwi.db` database file if it exists, creates the `sqlite3` database, and populates the database with the `followers` and `followees` tables.
 It will not delete the profiles database.
 
 ## Update followers/followees database
 
-    ./zwi.py update --help
-    ./zwi.py -v update
+    ./zwi update --help
+    ./zwi -v update
 
 The `update` function refreshes the `followers` and `followees` information.
 (Currently, this function is being fleshed out.  It does not yet report any differences. Also, it fails to profess deletions.)
 
 ## Update profile database
 
-    ./zwi.py pro-update --help
-    ./zwi.py [-v] pro-update [--force]
+    ./zwi pro-update --help
+    ./zwi [-v] pro-update [--force]
 
 The `pro-update` function will update the local DB profile cache using information in the local Zwift user `followers` and `followees` DB cache.
 
 ## List profile database entries
 
-    ./zwi.py pro-list --help
-    ./zwi.py pro-list
+    ./zwi pro-list --help
+    ./zwi pro-list
 
 
 ## bokeh
 
-    bokeh serve --show ./zwibok.py
+    ./zwibok
 
 The `profile` database can be viewed using the `zwibok` app.
 This all needs to be rewritten soon, but is is somewhat functional.
 
 ## Gui
 
-    ./zwi.py gui --help
-    ./zwi.py gui
+    ./zwi gui --help
+    ./zwi gui
 
 The `gui` function pops up a window displaying data from the local database copy of the Zwift `followers` and `followees` tables.
 
@@ -110,8 +110,8 @@ For Linux, it appears the key bindings map to the CTRL key.  The menu items will
 
 ## Followees
 
-    ./zwi.py wees --help
-    ./zwi.py wees
+    ./zwi wees --help
+    ./zwi wees
 
 The `wees` function will check the cached followees list (them who's followed).
 Any subject who is being followed but who is not reciprocating is displayed.
@@ -119,8 +119,8 @@ You will have to manually search for the user in the Zwift companion and decide 
 
 ## Followers
 
-    ./zwi.py wers --help
-    ./zwi.py wers
+    ./zwi wers --help
+    ./zwi wers
 
 The `wers` function will check the cached followers list and display any lacking reciprocity.
 Certain users will follow you, but not respond to reciprocal follow requests, remaining forever in limbo.
@@ -133,7 +133,8 @@ The `clear` function will remove any cached user/password information from the k
 
 # Hints
 
-When manually deleting followees, and searching by name, I find it helps to type in the bits of the name which are more likely to be unique, so as to limit the lists presented.
+
+When manually deleting followees, using the Zwift companion app, and searching by name, I find it helps to type in the bits of the name which are more likely to be unique, so as to limit the lists presented.
 
 # User Feedback
 

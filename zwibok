@@ -1,0 +1,7 @@
+#!/usr/bin/env bash
+#
+# -*- coding: utf-8 -*-
+#
+# Copyright (c) 2021 Damon Anton Permezel, all bugs revered.
+
+exec bokeh serve --show src/zwibok.py

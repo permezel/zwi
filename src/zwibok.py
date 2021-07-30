@@ -4,14 +4,29 @@
 #
 # Copyright (c) 2021 Damon Anton Permezel, all bugs revered.
 
+import os
 import sys
 import random
 import time
-import math
 from threading import Thread
-import util
-from util import ZwiPro, debug, verbo, get_zdir
 
+# for now, nothing here is intended to be installed or `pip`able.
+# Fixup the system path to add in ./src so the imports work.
+#
+from os.path import abspath, dirname
+sys.path.insert(0, abspath(dirname(__file__)) + os.sep + 'src')
+
+import zwi
+from zwi import ZwiPro, debug, verbo, get_zdir
+
+# XXXXXXXXXXXXXx
+# This is just madly hacked together so as to figure out minimal Bokeh to
+# get something working.
+# A massive restructure/rewrite is due soon.
+# XXXXXXXXXXXXXx
+#
+# There is some flask stuff I cut&pasted which currently does nothing.
+#
 try:
     import bokeh
     from bokeh.io import curdoc
@@ -128,7 +143,7 @@ def ic_callback(cache):
 #
 # attach the asset cache for the images
 #
-icache = util.AssetCache(get_zdir('.image-cache'), ic_callback)
+icache = zwi.AssetCache(get_zdir('.image-cache'), ic_callback)
 
 # XXXXXXXXXXXXXXXXXXXXXXXXX
 # This does not work. I need to run a local WEB server to

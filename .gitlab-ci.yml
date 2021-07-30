@@ -1,9 +1,13 @@
+#
+# thrashing about wildly trying to get some tests....
+#
 image: python:3.9-alpine3.14
 
 stages:          # List of stages for jobs, and their order of execution
-  - build
   - test
-  - deploy
+
+#  - build
+#  - deploy
 
 # Change pip's cache directory to be inside the project directory since we can
 # only cache local items.
@@ -26,13 +30,19 @@ before_script:
   - virtualenv venv
   - source venv/bin/activate
 
+build-job:       # This job runs in the build stage, which runs first.
+  stage: build
+  script:
+    - echo "Compiling the code..."
+    - echo "Compile complete."
+
 test:
   stage: test
   script:
     - echo python setup.py test
     - echo pip install tox flake8  # you can also use tox
     - echo tox -e py36,flake8
-    - pytest --junitxml=report.xml
+    - echo pytest --junitxml=report.xml
   artifacts:
     when: always
     reports:
@@ -48,12 +58,6 @@ pages:
       - public
   rules:
     - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
-
-build-job:       # This job runs in the build stage, which runs first.
-  stage: build
-  script:
-    - echo "Compiling the code..."
-    - echo "Compile complete."
 
 deploy-job:      # This job runs in the deploy stage.
   stage: deploy  # It only runs when *both* jobs in the test stage complete successfully.
