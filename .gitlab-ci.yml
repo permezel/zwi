@@ -4,10 +4,9 @@
 image: python:3.9-alpine3.14
 
 stages:          # List of stages for jobs, and their order of execution
+  - build
   - test
-
-#  - build
-#  - deploy
+  - deploy
 
 # Change pip's cache directory to be inside the project directory since we can
 # only cache local items.
