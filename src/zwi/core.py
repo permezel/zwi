@@ -23,7 +23,7 @@ except Exception as __ex:
 _zwi_auth_cache = {}
 
 
-def get_zdir(subdir: str = None) -> str:
+def get_zdir(subdir: str = None, mkdir: bool = True) -> str:
     """Establish local Zwi directory."""
 
     if subdir is not None:
@@ -32,7 +32,7 @@ def get_zdir(subdir: str = None) -> str:
         zdir = os.getenv('HOME') + os.sep + '.zwi' + os.sep
         pass
 
-    if not os.path.isdir(zdir):
+    if mkdir and not os.path.isdir(zdir):
         try:
             os.mkdir(zdir)
         except Exception as e:
@@ -43,9 +43,9 @@ def get_zdir(subdir: str = None) -> str:
     return zdir
 
 
-def get_zpath(dname: str = None, fname: str = None, subdir: str = None) -> str:
+def get_zpath(dname: str = None, fname: str = None, subdir: str = None, mkdir: bool = True) -> str:
     """Provide the default database path, or overrides to it."""
-    dname = get_zdir(subdir=subdir) if dname is None else dname
+    dname = get_zdir(subdir=subdir, mkdir=mkdir) if dname is None else dname
     fname = 'zwi.db' if fname is None else fname
     if dname[-1] == os.sep:
         return dname + fname
@@ -154,7 +154,7 @@ def zwi_init(zid='me'):
 class DataBase(object):
     cache = {}  # DB universe
 
-    def __init__(self, path=None, reset=False):
+    def __init__(self, path=None, reset=False, create=False):
         self._path = path  # = DataBase.db_path(path)
         self._cur = None
 
@@ -167,7 +167,7 @@ class DataBase(object):
                 raise Error(f'Programming error: {path} already exists in cache.')
             pass
 
-        self._db = DataBase.__db_connect(path, reset)
+        self._db = DataBase.__db_connect(path, reset, create)
         super().__init__()
 
         DataBase.cache[path] = self
@@ -180,10 +180,13 @@ class DataBase(object):
             pass
 
     @staticmethod
-    def __db_connect(path, reset=False):
+    def __db_connect(path, reset=False, create=False):
         """Setup DB for access."""
 
-        debug(2, f'{path=}')
+        debug(2, f'{path=} {reset=} {create=}')
+        if not create and not os.path.isfile(path):
+            raise SystemExit(f'Database file {path} does not exist.')
+
         if reset and os.path.isfile(path):
             try:
                 os.remove(path)
@@ -203,11 +206,12 @@ class DataBase(object):
         return DataBase.cache[path]
 
     @classmethod
-    def db_connect(cls, path=None, reset=False):
+    def db_connect(cls, path=None, reset=False, create=False):
         """Connect to a database."""
-        path = get_zpath() if path is None else path
+        path = get_zpath(mkdir=create) if path is None else path
+        debug(2, f'db_connect: {path=} {reset=} {create=}')
         if path not in cls.cache:
-            return DataBase(path=path, reset=reset)
+            return DataBase(path=path, reset=reset, create=create)
         else:
             return cls.cache[path]
         pass
@@ -875,9 +879,9 @@ class ZwiUser(object):
         if self._db is None:  # attach to the usual DB
             if uid is not None:
                 # put into a different data base
-                self._db = DataBase.db_connect(get_zpath(subdir=f'{uid}'))
+                self._db = DataBase.db_connect(get_zpath(subdir=f'{uid}', mkdir=update), create=update)
             else:
-                self._db = DataBase.db_connect()
+                self._db = DataBase.db_connect(create=update)
                 pass
             pass
 
@@ -910,21 +914,21 @@ class ZwiUser(object):
             cnt = 0
             for r in self._wers:
                 self._pro.update(r[werid])
-                if verbo_p(1):
+                if verbo_p(0):
                     print(f'\rupdate profile of followers: {cnt}', end='')
                     pass
                 cnt += 1
                 pass
-            verbo(1, '')
+            verbo(0, '')
             cnt = 0
             for r in self._wees:
                 self._pro.update(r[weeid])
-                if verbo_p(1):
+                if verbo_p(0):
                     print(f'\rupdate profile of followees: {cnt}', end='')
                     pass
                 cnt += 1
                 pass
-            verbo(1, '')
+            verbo(0, '')
             pass
         pass
 
@@ -1096,7 +1100,11 @@ class ZwiPro(object):
         if zid in self._lookup:
             rv = self._pro[self._lookup[zid]]
             if isinstance(rv, tuple):
+                # we got this from a DB read
                 return ZwiProfile.from_seq(rv)
+            if isinstance(rv, dict):
+                # we got this from a Zwift query
+                return ZwiProfile.from_zwift(rv)
             return rv
         return self.update(zid) if fetch else None
 

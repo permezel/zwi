@@ -199,6 +199,20 @@ if False:
     print(df['imageSrc'])
     pass
 
+NONE = 'https://upload.wikimedia.org/wikipedia/commons/c/ce/Image_of_none.svg'
+
+def map_none(x):
+    if x is None or x == 'None':
+        return NONE
+    else:
+        return x
+    pass
+
+df['imageSrc'] = df['imageSrc'].apply(lambda x: map_none(x))
+print(df['imageSrc'])
+pass
+
+
 sliders = {}
 # Set up layouts and add to document
 inputs = column(text,

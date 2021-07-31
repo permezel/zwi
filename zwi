@@ -163,9 +163,17 @@ def update():
 @click.option('--force', is_flag=True, help='Force refresh.')
 def pro_update(force):
     """Update the profile DB based on user's follower/followee DB cache."""
+
+    if zwi.verbo_p(1):
+        skip = []
+    else:
+        skip=['date', 'hours', 'distance', 'climbed', 'bike']
+        pass
+
+    zwi.verbo(1, f'Impersonating user {zid}')
     usr = ZwiUser()
     pro = ZwiPro()
-    pr = pro.Printer()
+    pr = pro.Printer(skip=skip)
     done = []
 
     def update(zid, force):
@@ -209,8 +217,14 @@ def pro_update(force):
 def pro_list():
     """List profile DB contents."""
 
+    if zwi.verbo_p(1):
+        skip = []
+    else:
+        skip=['date', 'hours', 'distance', 'climbed', 'bike']
+        pass
+
     pro = ZwiPro()
-    pr = pro.Printer()
+    pr = pro.Printer(skip=skip)
 
     for p in ZwiPro():
         pr.out(p)
@@ -266,7 +280,7 @@ def gui():
 
     
 @cli.command()
-@click.option('--zid', help='Zwift ID to inspect')
+@click.option('--zid', prompt='Zwift user ID', help='Zwift ID to inspect')
 @click.option('--update', is_flag=True, help='update existing DB entries from Zwift')
 def inspect(zid, update):
     """Inspect Zwift user `zid` and slurp down the followers/followees."""
@@ -277,7 +291,7 @@ def inspect(zid, update):
         skip=['date', 'hours', 'distance', 'climbed', 'bike']
         pass
 
-    zwi.verbo(1, f'Impersonating user {zid}')
+    zwi.verbo(1, f'Inspecting user {zid}')
 
     pro = ZwiPro()
     pseudo = ZwiUser(uid=int(zid), update=update, pro_update=pro)
