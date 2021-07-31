@@ -20,7 +20,7 @@ except Exception as __ex:
     raise SystemExit('please run: pip3 install zwift-client keyring')
 
 # Cache of authentication, so we establish at most once
-zwi_auth_cache = {}
+_zwi_auth_cache = {}
 
 
 def get_zdir(subdir: str = None) -> str:
@@ -117,10 +117,10 @@ def clear():
 
 def zwi_init(zid='me'):
     """Initialise communications with Zwift API."""
-    global zwi_auth_cache
+    global _zwi_auth_cache
 
-    if zid in zwi_auth_cache:
-        v = zwi_auth_cache[zid]
+    if zid in _zwi_auth_cache:
+        v = _zwi_auth_cache[zid]
         return v[0], v[1]
 
     try:
@@ -143,7 +143,7 @@ def zwi_init(zid='me'):
         pr = cl.get_profile()
         pr.check_player_id()
         print('player_id:', pr.player_id)
-        zwi_auth_cache[zid] = [cl, pr]
+        _zwi_auth_cache[zid] = [cl, pr]
         return cl, pr
     except Exception as e:
         print('Error:', e)
@@ -862,6 +862,14 @@ class ZwiUser(object):
     def wers_dict(self):
         return self._wers_dict
 
+    def wees_iter(self):
+        """Construct an iterator to produce the wees as ZwiFollowers objects."""
+        return (ZwiFollowers.wees(x) for x in self._wees)
+
+    def wers_iter(self):
+        """Construct an iterator to produce the wers as ZwiFollowers objects."""
+        return (ZwiFollowers.wers(x) for x in self._wers)
+        
     def _setup(self, drop, update, uid):
         """Syncronise with the local DB version of the world."""
         if self._db is None:  # attach to the usual DB
@@ -899,12 +907,24 @@ class ZwiUser(object):
         self._slurp(self._wers, self._wers_dict, werid, 'followers')
         self._slurp(self._wees, self._wees_dict, weeid, 'followees')
         if self._pro is not None:
+            cnt = 0
             for r in self._wers:
                 self._pro.update(r[werid])
+                if verbo_p(1):
+                    print(f'\rupdate profile of followers: {cnt}', end='')
+                    pass
+                cnt += 1
                 pass
+            verbo(1, '')
+            cnt = 0
             for r in self._wees:
                 self._pro.update(r[weeid])
+                if verbo_p(1):
+                    print(f'\rupdate profile of followees: {cnt}', end='')
+                    pass
+                cnt += 1
                 pass
+            verbo(1, '')
             pass
         pass
 
@@ -1068,13 +1088,17 @@ class ZwiPro(object):
         if count: verbo(1, '')
         pass
 
-    def lookup(self, zid):
+    def lookup(self, zid, fetch=False):
+        """Lookup `zid` in cache, converting to ZwiProfile if found.
+        Inputs:
+            fetch    - fetch from Zwift if not in cache (update DB)
+        """
         if zid in self._lookup:
             rv = self._pro[self._lookup[zid]]
             if isinstance(rv, tuple):
                 return ZwiProfile.from_seq(rv)
             return rv
-        return None
+        return self.update(zid) if fetch else None
 
     def update(self, zid=None, force=False):
         """Update the profile for `zid` if not currently in the DB.
@@ -1140,6 +1164,65 @@ class ZwiPro(object):
             print(f'Some error trying to update id {old.id}.')
             pass
         return None
+
+    class Printer():
+        fmt = [ ('date',     ('{:18.18s} ',  '{p.addDate:18.18s} ')),
+                ('ZwiftID',  ('{:>8.8s} ',   '{p.id:8d} ')),
+                ('FTP',      ('{:>4.4s} ',   '{p.ftp:4d} ')),
+                ('level',    ('{:>5.5s} ',   '{p.achievementLevel/100.0:5.2f} ')),
+                ('hours',    ('{:>6.6s} ',   '{p.totalTimeInMinutes//60:6d} ')),
+                ('distance', ('{:>8.8s} ',   '{p.totalDistance:8d} ')),
+                ('climbed',  ('{:>8.8s} ',   '{p.totalDistanceClimbed:8d} ')),
+                ('bike',     ('{:16.16s} ',  '{p.virtualBikeModel:16.16s} ')),
+                ('name',     ('{:s}',        '{p.firstName} {p.lastName}')),
+        ]
+        def __init__(self, title=None, skip=[]):
+            self.line_cnt = 0
+            self.title = title
+            self.fmt = self.__class__.fmt
+            self.fmtc = [cn for (cn, x) in self.fmt]
+            for c in skip:
+                if c in self.fmtc:
+                    idx = self.fmtc.index(c)
+                    del self.fmt[idx]
+                    del self.fmtc[idx]
+                    pass
+                pass
+            pass
+        
+        def out_hdr(self, prefix):
+            """Output the header."""
+            print(prefix, end='')
+            for idx in range(len(self.fmtc)):
+                print(self.fmt[idx][1][0].format(self.fmtc[idx]), end='')
+                pass
+            print('')
+            pass
+
+        def out_body(self, p, prefix):
+            """Output the body."""
+            print(prefix, end='')
+            for idx in range(len(self.fmtc)):
+                print(eval("f'" + self.fmt[idx][1][1] +"'"), end='')
+                pass
+            print('')
+            
+        def out(self, p, prefix=' '):
+            if p is None: return	# accept None objects
+
+            if self.line_cnt == 0 and self.title:
+                # Emit title prior to first line.
+                print(self.title)
+                self.title = None
+                pass
+                
+            self.line_cnt += 1
+            if self.line_cnt % 32 == 1:
+                self.out_hdr(' ')
+                pass
+            self.out_body(p, prefix)
+            pass
+        pass
     pass
 
 

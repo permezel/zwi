@@ -56,17 +56,16 @@ def clear():
 @cli.command()
 def wees():
     """Display followees who are not following me."""
-    return followees()
+    return followees(ZwiUser())
 
 
 @cli.command()
 def wers():
     """Display followers who I am not following."""
-    return followers()
+    return followers(ZwiUser())
 
-def followees():
+def followees(usr):
     count = 0
-    usr = ZwiUser()
     for r in usr.wees:
         d = dict(zip(usr.cols, r))
         count += 1
@@ -90,9 +89,8 @@ def followees():
     pass
 
 
-def followers():
+def followers(usr):
     count = 0
-    usr = ZwiUser()
     for r in usr.wers:
         d = dict(zip(usr.cols, r))
         count += 1
@@ -161,49 +159,13 @@ def update():
 
     return 0
 
-@dataclass
-class ProPrinter():
-    line_cnt: int = 0  # output line count
-
-    def out(self, p, prefix=' '):
-        self.line_cnt += 1
-        if self.line_cnt % 32 == 1:
-            print((' ' +
-                  '{0:18.18s} {1:>8.8s} {2:>4.4s} ' +
-                  '{3:>5.5s} ' +
-                  '{4:>6.6s} ' +
-                  '{5:>8.8s} ' +
-                  '{6:>8.8s} ' +
-                  '{7:16.16s} ' +
-                  '{8:s}').format(
-                      'date',
-                      'ZwiftID',
-                      'FTP',
-                      'level',
-                      'hours',
-                      'distance',
-                      'climbed',
-                      'bike',
-                      'name'))
-            pass
-        print(prefix +
-              f'{p.addDate:18.18s} {p.id:8d} {p.ftp:4d} ' +
-              f'{p.achievementLevel/100.0:5.2f} ' +
-              f'{p.totalTimeInMinutes//60:6d} ' +
-              f'{p.totalDistance:8d} ' +
-              f'{p.totalDistanceClimbed:8d} ' +
-              f'{p.virtualBikeModel:16.16s} ' +
-              f'{p.firstName} {p.lastName}')
-        pass
-    pass
-
 @cli.command()
 @click.option('--force', is_flag=True, help='Force refresh.')
 def pro_update(force):
     """Update the profile DB based on user's follower/followee DB cache."""
     usr = ZwiUser()
     pro = ZwiPro()
-    pr = ProPrinter()
+    pr = pro.Printer()
     done = []
 
     def update(zid, force):
@@ -248,7 +210,7 @@ def pro_list():
     """List profile DB contents."""
 
     pro = ZwiPro()
-    pr = ProPrinter()
+    pr = pro.Printer()
 
     for p in ZwiPro():
         pr.out(p)
@@ -264,7 +226,7 @@ def pro_refresh(skip, zid, seek):
     skip = 0 if skip is None else int(skip)
 
     pro = ZwiPro()
-    pr = ProPrinter()
+    pr = pro.Printer()
 
     for p in pro:
         if skip > 0:
@@ -303,6 +265,41 @@ def gui():
         raise SystemExit(e)
 
     
+@cli.command()
+@click.option('--zid', help='Zwift ID to inspect')
+@click.option('--update', is_flag=True, help='update existing DB entries from Zwift')
+def inspect(zid, update):
+    """Inspect Zwift user `zid` and slurp down the followers/followees."""
+
+    if zwi.verbo_p(1):
+        skip = []
+    else:
+        skip=['date', 'hours', 'distance', 'climbed', 'bike']
+        pass
+
+    zwi.verbo(1, f'Impersonating user {zid}')
+
+    pro = ZwiPro()
+    pseudo = ZwiUser(uid=int(zid), update=update, pro_update=pro)
+    vic = pro.lookup(zid)
+    if vic is None:
+        vic = pro.update(zid)
+        pass
+    if vic is None:
+        raise SystemExit(f'Zwift user {zid} not in profiles data base.')
+
+    pr = pro.Printer(f'followers of {vic.firstName} {vic.lastName}', skip=skip)
+    for f in pseudo.wers_iter():
+        pr.out(pro.lookup(f.followerId))
+        pass
+    
+    pr = pro.Printer(f'followees of {vic.firstName} {vic.lastName}', skip=skip)
+    for f in pseudo.wees_iter():
+        pr.out(pro.lookup(f.followeeId))
+        pass
+
+    return 0
+
 # disable this ...
 # @cli.command()
 def devel():

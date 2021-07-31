@@ -94,12 +94,13 @@ Key Bingings (for OSX):
 
     CMD-1  Switch to `followers` table.
     CMD-2  Switch to `followees` table.
+    CMD-a  Toggle `auto` mode.
     CMD-n  Move to next entry.
     CMD-p  Move to previous entry.
     CMD-f  Search (not yet implemented).
     CMD-q  Quit
 
-If `auto` mode is enabled (menu item) then:
+If `auto` mode is enabled:
 
     CMD-n  increase interval
     CMD-p  decrease interval
@@ -126,6 +127,15 @@ The `wers` function will check the cached followers list and display any lacking
 Certain users will follow you, but not respond to reciprocal follow requests, remaining forever in limbo.
 One can always try unfollowing/refollowing to see if the recalcitrant is interested in reciprocity.
 As above, as far as I know, one has to use the Zwift companion app to search by name.
+
+## Inspect other user's public information.
+
+Per the Zwift privacy policy, various data are publicly accessible.  The `inspect` command
+facilitates examination of the publicly available date.
+
+    ./zwi inspect --help
+    ./zwi inspect --zid=ZwiftUser
+    ./zwi -v inspect --zid=ZwiftUser --update
 
 ## Removing authentication information
 
