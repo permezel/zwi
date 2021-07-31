@@ -42,6 +42,7 @@ test:
     - echo pip install tox flake8  # you can also use tox
     - echo tox -e py36,flake8
     - echo pytest --junitxml=report.xml
+    - touch report.xml
   artifacts:
     when: always
     reports:
@@ -49,9 +50,9 @@ test:
 
 pages:
   script:
-    - pip install sphinx sphinx-rtd-theme
-    - cd doc ; make html
-    - mv build/html/ ../public/
+    - echo pip install sphinx sphinx-rtd-theme
+    - echo 'cd doc ; make html'
+    - echo mv build/html/ ../public/
   artifacts:
     paths:
       - public
