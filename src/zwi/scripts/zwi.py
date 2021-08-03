@@ -170,7 +170,6 @@ def pro_update(force):
         skip=['date', 'hours', 'distance', 'climbed', 'bike']
         pass
 
-    zwi.verbo(1, f'Impersonating user {zid}')
     usr = ZwiUser()
     pro = ZwiPro()
     pr = pro.Printer(skip=skip)
