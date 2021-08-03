@@ -1061,7 +1061,7 @@ class ZwiPro(object):
     def _setup(self, drop, update):
         """Syncronise with the local DB version of the world."""
         if self._db is None:  # attach to the usual DB
-            self._db = DataBase.db_connect(get_zpath(fname='profile.db'))
+            self._db = DataBase.db_connect(get_zpath(fname='profile.db'), create=True)
             pass
 
         if drop:
