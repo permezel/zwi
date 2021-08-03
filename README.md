@@ -8,26 +8,10 @@ Here are some small python programmes to facilitate viewing Zwift data.
     A Zwift account username and password
     python3
     pip3
-    click
-    zwift-client
-    keyring
-    pandas
-    bokeh
-    PyQt5
 
-    pip3 install click
-    pip3 install keyring
-    pip3 install zwift-client
-    pip3 install pandas
-    pip3 install bokeh
-    pip3 install PyQt5
-
+    pip3 install zwi
 
 # Usage
-
-This development build has migrated to yet another layout.
-See below for the development setup.
-When running in a `pyenv` the `$PATH` will be setup so that the programmes are installed as automatically generated scripts.
 
     zwi --help
 
