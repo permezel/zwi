@@ -1,0 +1,13 @@
+channels:
+- conda-forge
+dependencies:
+- pip:
+  - flit
+- python>=3.9
+- pip
+- keyring
+- pandas
+- click
+- bokeh
+name: zwi
+

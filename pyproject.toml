@@ -1,0 +1,35 @@
+[build-system]
+requires = ['flit_core >=3.2,<4']
+build-backend = 'flit_core.buildapi'
+
+[project]
+name = 'zwi'
+authors = [
+    {name = 'Damon Permezel', email = 'permezel@me.com'},
+]
+readme = 'README.md'
+classifiers = [
+    'Programming Language :: Python :: 3',
+    'License :: OSI Approved :: MIT License',
+    'Operating System :: OS Independent',
+]
+requires-python = '>=3.9'
+dynamic = ['version', 'description']
+
+dependencies = [
+    'zwift-client',
+    'PyQt5',
+    'click',
+    'keyring',
+    'bokeh',
+    'pandas',
+]
+
+  [project.urls]
+  source = 'https://github.com/permezel/zwi'
+  bug_tracker = 'https://github.com/permezel/zwi/issues'
+
+  [project.scripts]
+  zwi = 'zwi.scripts.zwi:main'
+  zwibok = 'zwi.scripts.zwibok:main'
+
