@@ -83,7 +83,7 @@ def auth(name, password, key='zwi.py'):
         # but if I force a fetch as below, I can discover
         # if there are issues.
         token_data = cl.auth_token.fetch_token_data()
-        if 'expires-in' not in token_data:
+        if 'access_token' not in token_data:
             estr = 'error'
             for k in ['error', 'error_description']:
                 if k in token_data:
