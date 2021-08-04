@@ -141,7 +141,7 @@ def csv(wers, wees):
 @cli.command()
 def reset():
     """Reset the database, refresh followers/followees data."""
-    db = DataBase.db_connect(reset=True)
+    db = DataBase.db_connect(reset=True, create=True)
     ZwiUser(db, update=True)
     ZwiPro().update(force=True)
 
