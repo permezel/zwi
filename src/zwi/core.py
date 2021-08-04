@@ -154,7 +154,10 @@ def zwi_init(zid='me', key='zwi.py'):
         return v[0], v[1]
 
     name = auth_user(key)
-    password = auth_passwd(name, key)
+    if name:
+        password = auth_passwd(name, key)
+    else:
+        raise SystemExit('User name not set -- re-run `auth`.')
 
     try:
         cl = Client(name, password)
