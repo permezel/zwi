@@ -1,5 +1,3 @@
-#!/usr/bin/env python3
-#
 # -*- coding: utf-8 -*-
 #
 # Copyright (c) 2021 Damon Anton Permezel, all bugs revered.
@@ -9,13 +7,6 @@ import os
 import signal
 import random
 import time
-
-# for now, nothing here is intended to be installed or `pip`able.
-# Fixup the system path to add in ./src so the imports work.
-#
-from os.path import abspath, dirname
-sys.path.insert(0, abspath(dirname(__file__)) + os.sep + 'src')
-
 import zwi
 from zwi import ZwiPro, ZwiUser, DataBase, get_zdir
 from dataclasses import dataclass
@@ -32,6 +23,12 @@ except Exception as ex__:
 def cli(verbose, debug):
     zwi.setup(verbose, debug)
     pass
+
+@cli.command()
+def version():
+    """Return the version number of the `zwi` package."""
+    print(zwi.__version__)
+    return
 
 @cli.command()
 @click.option('--name', prompt='Enter Zwift username', help='Zwift username')
@@ -327,9 +324,7 @@ def devel():
     for r in usr.wees:
         d = dict(zip(usr.cols, r))
         pro.update(d['followeeId'])
-        if zwi.verbo_p(0):
-            print(f'''\rprocessed {d['followeeId']}: {count}''', end='')
-            pass
+        zwi.verbo(0, f'\rprocessed {d["followeeId"]}: {count}', end='')
         count += 1
         pass
     zwi.verbo(0, '')
@@ -338,16 +333,11 @@ def devel():
     for r in usr.wers:
         d = dict(zip(usr.cols, r))
         pro.update(d['followerId'])
-        if zwi.verbo_p(0):
-            print(f'''\rprocessed {d['followerId']}: {count}''', end='')
-            pass
+        zwi.verbo(0, f'\rprocessed {d["followerId"]}: {count}', end='')
         count += 1
         pass
     zwi.verbo(0, '')
 
-    # see if I can get follower[0]'s followee list
-    # print(f'uid={usr.wers[0][0]}')
-    # usr0 = ZwiUser(uid=usr.wers[0][0], update=True, pro_update=True)
     zwi.setup(1, zwi.debug_lvl)
     
     count = 0
@@ -358,20 +348,11 @@ def devel():
 
         print(f'{d["id"]}')
         ZwiUser(uid=d['id'], update=True, pro_update=pro)
-        if zwi.verbo_p(1):
-            print(f'''processed {d['id']}: {count}''')
-            pass
+        zwi.verbo(1, f'processed {d["id"]}: {count}')
         count += 1
         pass
     pass
 
-    
-# disable this ...
-# @cli.command()
-def flask_test():
-    """Test using flask to serve the image cache."""
-    return 0
-    
     
 # disable this ...
 # @cli.command()

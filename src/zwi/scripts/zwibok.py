@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 #
 # Copyright (c) 2021 Damon Anton Permezel, all bugs revered.
-'''Bokeh-based interface to ZwiPro profile data.'''
+"""Bokeh-based interface to ZwiPro profile data."""
 
 import os
 import sys
@@ -27,9 +27,9 @@ from bokeh.embed import server_document
 from bokeh.events import ButtonClick
 from bokeh.io import curdoc
 from bokeh.layouts import column, row
-from bokeh.models import ColumnDataSource, Slider, TextInput, Dropdown, Select, Toggle, HoverTool
+from bokeh.models import ColumnDataSource, Slider, TextInput, Dropdown, Select
 from bokeh.models import CDSView, GroupFilter, BooleanFilter, IndexFilter
-from bokeh.models import Button
+from bokeh.models import Button, Toggle, HoverTool
 from bokeh.models.glyphs import Text, Rect
 from bokeh.models.annotations import Title
 from bokeh.plotting import figure, show, output_notebook
@@ -103,14 +103,21 @@ class ZwiBok(object):
     def __init__(self, doc):
         self.doc = doc
         # Set up widgets
-        self.text = TextInput(title='', value='', width=2*COL_WIDTH, height=ROW_HEIGHT)
-        self.x_sel = Select(value='age', title='X', options=self.icol, width=COL_WIDTH, height=ROW_HEIGHT)
-        self.y_sel = Select(value='ftp', title='Y', options=self.icol, width=COL_WIDTH, height=ROW_HEIGHT)
+        self.text = TextInput(title='', value='',
+                              width=2*COL_WIDTH, height=ROW_HEIGHT)
+        self.x_sel = Select(value='age', title='X', options=self.icol,
+                            width=COL_WIDTH, height=ROW_HEIGHT)
+        self.y_sel = Select(value='ftp', title='Y', options=self.icol,
+                            width=COL_WIDTH, height=ROW_HEIGHT)
         self.reset = Button(label='reset', width=COL_WIDTH, height=ROW_HEIGHT)
-        self.radius = Slider(title='radius', value=10, start=1, end=20, step=1, width=COL_WIDTH, height=ROW_HEIGHT)
-        self.do_male = Toggle(label='male', active=True, width=COL_WIDTH, height=ROW_HEIGHT)
-        self.do_fema = Toggle(label='female', active=True, width=COL_WIDTH, height=ROW_HEIGHT)
-        self.buto = row(self.do_male, self.do_fema, width=2*COL_WIDTH, height=ROW_HEIGHT)
+        self.radius = Slider(title='radius', value=10, start=1, end=20, step=1,
+                             width=COL_WIDTH, height=ROW_HEIGHT)
+        self.do_male = Toggle(label='male', active=True,
+                              width=COL_WIDTH, height=ROW_HEIGHT)
+        self.do_fema = Toggle(label='female', active=True,
+                              width=COL_WIDTH, height=ROW_HEIGHT)
+        self.buto = row(self.do_male, self.do_fema,
+                        width=2*COL_WIDTH, height=ROW_HEIGHT)
 
         self.need_reset = False
         self.need_update = False
@@ -138,7 +145,9 @@ class ZwiBok(object):
         # Set up layouts and add to document
         self.inputs = column(self.text,
                              self.buto,
-                             row(self.x_sel, self.y_sel, width=2*COL_WIDTH, height=ROW_HEIGHT, sizing_mode='fixed'),
+                             row(self.x_sel, self.y_sel,
+                                 width=2*COL_WIDTH, height=ROW_HEIGHT,
+                                 sizing_mode='fixed'),
                              self.radius,
                              *[x[2] for x in self.sliders.values()],
                              self.reset,
@@ -146,7 +155,8 @@ class ZwiBok(object):
                              sizing_mode='fixed')
 
         self.doc.add_periodic_callback(self.update, 100)
-        self.doc.add_root(row(self.inputs, self.fig, sizing_mode='fixed', width=1280, height=1024))
+        self.doc.add_root(row(self.inputs, self.fig, sizing_mode='fixed',
+                              width=1280, height=1024))
         pass
 
     def refresh_profile(self):
@@ -164,12 +174,12 @@ class ZwiBok(object):
         pass
 
     def setup_sliders(self):
-        '''Setup the sliders based on the limits of the current DataFrame.'''
+        """Setup the sliders based on the limits of the current DataFrame."""
         
         # slider restriction function: used below
         def do_restrict(smin, smax, c, cb, a,b,n):
             """Callback function to modify data based on slider settings."""
-            debug(3, f'restrict: {smin=} {smax=} {c=} {smin.value=} {smax.value=} {cb=} {n=}')
+            debug(3, f'restrict: {c=} {smin.value=} {smax.value=} {cb=} {n=}')
             self.doc.hold(policy='combine')	# combine all events
 
             n = int(n)
@@ -204,10 +214,13 @@ class ZwiBok(object):
             ma = self.df[c].max()
             mi = self.df[c].min()
             if ma != mi:
-                smax = Slider(title=f'max {c}', value=ma, start=mi, end=ma, step=1, width=COL_WIDTH, height=ROW_HEIGHT)
-                smin = Slider(title=f'min {c}', value=mi, start=mi, end=ma, step=1, width=COL_WIDTH, height=ROW_HEIGHT)
+                smax = Slider(title=f'max {c}', value=ma, start=mi, end=ma,
+                              step=1, width=COL_WIDTH, height=ROW_HEIGHT)
+                smin = Slider(title=f'min {c}', value=mi, start=mi, end=ma,
+                              step=1, width=COL_WIDTH, height=ROW_HEIGHT)
 
-                self.sliders[c] = (smin, smax, row(smin, smax, width=300, height=ROW_HEIGHT, sizing_mode='fixed'))
+                self.sliders[c] = (smin, smax, row(smin, smax, width=300,
+                                                   height=ROW_HEIGHT, sizing_mode='fixed'))
 
                 cb = gen_restrict(smin, smax, c)
                 if debug_p(3):
@@ -237,7 +250,7 @@ class ZwiBok(object):
         pass
 
     def refresh_sliders(self):
-        '''Adjust the sliders when the DataFrame changes.'''
+        """Adjust the sliders when the DataFrame changes."""
         for c in self.sliders.keys():
             ma = self.df[c].max()
             mi = self.df[c].min()
@@ -266,7 +279,8 @@ class ZwiBok(object):
                 fuzz = (mi.end+1 - mi.start) // 10
                 pass
             debug(2, f'{mi.value=} {mi.value+fuzz=}')
-            xy = [(x,y) for (x,y) in self.precomputed['age'] if mi.value-fuzz <= x and mi.value >= x]
+            xy = [(x,y) for (x,y) in self.precomputed['age']
+                  if mi.value-fuzz <= x and mi.value >= x]
             debug(2, f'{xy=}')
             xy = [(x,y) for (x,y) in xy if ma.value <= y and ma.value+fuzz >= y]
             if len(xy) > 0:
@@ -283,8 +297,8 @@ class ZwiBok(object):
         pass
     
     def slider_touched(self, key):
-        # debug(2, f'{min=}, {max=}, {min.start=}, {min.value=}, {max.value=}, {max.end=}')
-        if key in ['XX_NO_MORE_age', 'XX_NO_MORE_ftp']:	# these are NO_MORE_always checked, as they are reduced
+        if key in ['XX_NO_MORE_age', 'XX_NO_MORE_ftp']:
+	    # these are XX_NO_MORE_always checked, as they are reduced
             return True
         else:
             mi = self.sliders[key][0]
@@ -486,8 +500,10 @@ class ZwiBok(object):
                 is_fema = [False for f in df['male']]
                 pass
 
-            vmale = CDSView(source=self.source, filters=[BooleanFilter(is_male), IndexFilter(index)])
-            vfema = CDSView(source=self.source, filters=[BooleanFilter(is_fema), IndexFilter(index)])
+            vmale = CDSView(source=self.source, filters=[BooleanFilter(is_male),
+                                                         IndexFilter(index)])
+            vfema = CDSView(source=self.source, filters=[BooleanFilter(is_fema),
+                                                         IndexFilter(index)])
 
             if reset:
                 hov = HoverTool(tooltips=None)
@@ -530,7 +546,9 @@ class ZwiBok(object):
                 self.fema_g.update(data_source=self.source, view=vfema)
                 pass
 
-            self.text.value = f'{x}::{y} plot: {is_male.count(True)} male, {is_fema.count(True)} female'
+            s = f'{x}::{y} plot: {is_male.count(True)} male,'
+            s += f'{is_fema.count(True)} female'
+            self.text.value = s
             pass
         pass
 
@@ -542,7 +560,8 @@ class ZwiBok(object):
             self.refresh_sliders()
             self.xy_plot_update()
             self.doc.clear()
-            self.doc.add_root(row(self.inputs, self.fig, sizing_mode='fixed', width=1280, height=1024))
+            self.doc.add_root(row(self.inputs, self.fig, sizing_mode='fixed',
+                                  width=1280, height=1024))
             self.need_reset = False
             pass
 
@@ -584,7 +603,7 @@ def cli(verbose, debug):
 @click.option('--port', default=5006, help='Run on specified port.')
 @cli.command()
 def serve(port):
-    '''Run ZwiBok server.'''
+    """Run ZwiBok server."""
 
     server = Server({
         '/zwibok': zwibok,
@@ -609,7 +628,7 @@ def main():
     pass
 
     
-'''
+"""
     def ic_callback(cache):
         debug(1, f'callback: {cache=}')
 
@@ -640,4 +659,4 @@ def main():
         print(df['imageSrc'])
         pass
 
-'''
+"""

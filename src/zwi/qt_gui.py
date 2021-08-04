@@ -1,9 +1,7 @@
-
-#!/usr/bin/env python3
-#
 # -*- coding: utf-8 -*-
 #
 # Copyright (c) 2021 Damon Anton Permezel, all bugs revered.
+"""PyQt-based GUI exploration."""
 
 import os
 import sys
@@ -43,8 +41,7 @@ def qt_gui():
     except Exception as e:
         print('import error:', e)
         print('pip3 install pyqt5')
-        sys.exit(1)
-        pass
+        raise SystemExit(e)
 
     try:
         sdir = os.path.dirname(os.path.realpath(__file__)) + os.sep

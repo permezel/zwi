@@ -15,6 +15,12 @@ Here are some small python programmes to facilitate viewing Zwift data.
 
     zwi --help
 
+## Version
+
+    zwi version
+
+The `version` function returns the version number of the currently installewd `zwi` package.
+
 ## Authentication
 
     zwi auth --help

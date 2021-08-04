@@ -10,7 +10,6 @@
 #
 # The local f/s is used to cache them.
 #
-
 import os
 import sys
 import time
@@ -21,6 +20,10 @@ import threading
 import queue
 
 class AssetCache(object):
+    """Asset Cache class.
+    Still under development, and not currently used for anything.
+    I intend to use it perhaps eventually....
+    """
 
     class Threads(threading.Thread):
         def __init__(self, cache):
@@ -48,7 +51,7 @@ class AssetCache(object):
         if self._path[-1] != os.sep:
             self._path += os.sep
             pass
-        pass
+        raise SystemExit('Write some more code....')
 
     def url_to_key(self, url):
         """Extract key from URL."""
@@ -245,7 +248,7 @@ class AssetCache(object):
                 pass
             try:
                 # XXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
-                # XXX massive security hole here
+                # XXX massive security hole here???
                 # XXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
                 os.remove(path)
             except Exception as e:

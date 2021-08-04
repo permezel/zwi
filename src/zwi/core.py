@@ -4,7 +4,7 @@
 #
 # Move the Zwi common stuff into a package
 #
-
+"""Zwi core stuff."""
 import sys
 import os
 import sqlite3 as sq
@@ -421,7 +421,8 @@ class ZwiBase(object):
     @staticmethod
     def to_dict(f, x, arg):
         """Assing values to a supplied dict().
-        Does not construct the dict or add any missing fields."""
+        Does not construct the dict or add any missing fields.
+        """
         if x.name in arg:
             # print(f'{x.name=} {x.type=} {arg[x.name]=}')
             if x.type in (int, bool):
@@ -444,7 +445,8 @@ class ZwiBase(object):
     @staticmethod
     def from_seq(f, x, arg):
         """Assign values from a sequence.
-        We perform a depth-first traversal."""
+        We perform a depth-first traversal.
+        """
         # print(f'{x.name=} {x.type=}')
         if x.type in (int, bool):
             setattr(f, x.name, arg[0][arg[1]])
@@ -1095,7 +1097,8 @@ class ZwiPro(object):
     def lookup(self, zid, fetch=False):
         """Lookup `zid` in cache, converting to ZwiProfile if found.
         Inputs:
-            fetch    - fetch from Zwift if not in cache (update DB)
+          zid   - Zwift user-id 
+          fetch - fetch from Zwift if not in cache (update DB)
         """
         if zid in self._lookup:
             rv = self._pro[self._lookup[zid]]
@@ -1110,7 +1113,8 @@ class ZwiPro(object):
 
     def update(self, zid=None, force=False):
         """Update the profile for `zid` if not currently in the DB.
-        If force is set, we update regardless."""
+        If force is set, we update regardless.
+        """
         if self._pr is None:
             self._cl, self._pr = zwi_init()
             pass
