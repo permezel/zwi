@@ -53,69 +53,99 @@ def get_zpath(dname: str = None, fname: str = None, subdir: str = None, mkdir: b
         return dname + os.sep + fname
 
 
-def auth(name: str, password: str) -> None:
-    """Establish the authentication."""
+def auth_user(key='zwi.py'):
+    """Return the user ID saved."""
+    try:
+        name = keyring.get_password(key, 'username')
+    except Exception as e:
+        print('Error:', e)
+        raise SystemExit(f'{e!r}: Cannot locate `username` entry -- re-run `auth`.')
 
+    return name
+
+
+def auth_passwd(name, key='zwi.py'):
+    """Return the password."""
+    try:
+        passwd = keyring.get_password(key, name)
+    except Exception as e:
+        print('Error:', e)
+        raise SystemExit(f'{e!r} Cannot locate `password` entry for user {name} -- re-run `auth`.')
+
+    return passwd
+
+
+def auth(name, password, key='zwi.py'):
+    """Establish the authentication."""
     try:
         cl = Client(name, password)
-        pr = cl.get_profile()
-        pr.check_player_id()
+        # there is no error checking in the above
+        # but if I force a fetch as below, I can discover
+        # if there are issues.
+        token_data = cl.auth_token.fetch_token_data()
+        if 'expires-in' not in token_data:
+            estr = 'error'
+            for k in ['error', 'error_description']:
+                if k in token_data:
+                    debug(1, f'{k:22} {token_data[k]}')
+                    estr += f': {token_data[k]}'
+                pass
+            raise SystemExit(estr)
+        else:
+            pr = cl.get_profile()
+            pr.check_player_id()
+    except ConnectionError as e:
+        raise SystemExit(f'Cannot connect to Zwift: {e}')
     except Exception as e:
-        error(f'Authentication failure: {e}')
-        pass
+        raise SystemExit(f'Authentication failure: {e}')
 
     try:
-        keyring.set_password('zwi.py', 'username', name)
+        keyring.set_password(key, 'username', name)
     except keyring.errors.PasswordSetError:
         raise SystemExit('Cannot set zwi.py username')
 
     try:
-        keyring.set_password('zwi.py', name, password)
+        keyring.set_password(key, name, password)
     except keyring.errors.PasswordSetError:
         raise SystemExit('Cannot set zwi.py username+password')
 
-    try:
-        if keyring.get_password('zwi.py', 'username') != name:
-            raise SystemExit('keyring username mismatch')
+    if auth_user(key) != name:
+        raise SystemExit('keyring username mismatch')
+    if auth_passwd(name, key=key) != password:
+        raise SystemExit('keyring password mismatch')
 
-        if keyring.get_password('zwi.py', name) != password:
-            raise SystemExit('keyring password mismatch')
-
-        sys.exit(0)
-    except keyring.errors.KeyringError as e:
-        raise SystemExit('***keyring error:', e)
-    pass
+    return True
 
 
-def check():
+def check(key='zwi.py'):
     """Verify that we have established the authentication."""
-    (cl, pr) = zwi_init()
-    sys.exit(0)
+    (cl, pr) = zwi_init(key=key)
     pass
 
 
-def clear():
+def clear(key='zwi.py'):
     """Clear out any saved authentication information."""
 
     try:
-        name = keyring.get_password('zwi.py', 'username')
+        name = keyring.get_password(key, 'username')
     except keyring.errors.KeyringError as e:
         raise SystemExit('***keyring error:', e)
 
-    try:
-        keyring.delete_password('zwi.py', name)
-    except keyring.errors.KeyringError as e:
-        raise SystemExit('Trying to delete password: ***keyring error:', e)
+    if name is not None:
+        try:
+            keyring.delete_password(key, name)
+        except keyring.errors.KeyringError as e:
+            raise SystemExit('Trying to delete password: ***keyring error:', e)
 
-    try:
-        keyring.delete_password('zwi.py', 'username')
-    except keyring.errors.KeyringError as e:
-        raise SystemExit('Trying to delete username: ***keyring error:', e)
+        try:
+            keyring.delete_password(key, 'username')
+        except keyring.errors.KeyringError as e:
+            raise SystemExit('Trying to delete username: ***keyring error:', e)
+        pass
+    return
 
-    return sys.exit(0)
 
-
-def zwi_init(zid='me'):
+def zwi_init(zid='me', key='zwi.py'):
     """Initialise communications with Zwift API."""
     global _zwi_auth_cache
 
@@ -123,20 +153,8 @@ def zwi_init(zid='me'):
         v = _zwi_auth_cache[zid]
         return v[0], v[1]
 
-    try:
-        name = keyring.get_password('zwi.py', 'username')
-    except Exception as e:
-        print('Error:', e)
-        raise SystemExit(f'{e!r}: Cannot locate `username` entry -- re-run `auth`.')
-
-    if name is None:
-        raise SystemExit('Error: no `username` has been specified -- re-run `auth`.')
-
-    try:
-        password = keyring.get_password('zwi.py', name)
-    except Exception as e:
-        print('Error:', e)
-        raise SystemExit(f'{e!r} Cannot locate `password` entry for user {name} -- re-run `auth`.')
+    name = auth_user(key)
+    password = auth_passwd(name, key)
 
     try:
         cl = Client(name, password)
@@ -145,6 +163,8 @@ def zwi_init(zid='me'):
         print('player_id:', pr.player_id)
         _zwi_auth_cache[zid] = [cl, pr]
         return cl, pr
+    except ConnectionError as e:
+        raise SystemExit('Cannot connect to Zwift: {e}.')
     except Exception as e:
         print('Error:', e)
         raise SystemExit('Authentication failure for user {name}.')
@@ -1236,11 +1256,3 @@ class ZwiPro(object):
             pass
         pass
     pass
-
-
-def reset():
-    """Reset the database, refresh followers/followees data."""
-    db = DataBase.db_connect(reset=True)
-    ZwiUser(db, update=True)
-
-    return 0
