@@ -11,7 +11,7 @@ Here are some small python programmes to facilitate viewing Zwift data.
 
 # usage
 
-The easist way to use this is to use `pip3 install` to install
+The easiest way to use this is to use `pip3 install` to install
 everything you need. Prior to that, you should probably have done
 something like: 
 
@@ -27,7 +27,7 @@ and dependencies.
 
 This will install everything required, and place two command scripts
 in `${ZWI_ENV}/bin` which will be in your `${PATH}` while the
-environjment is activated. 
+environment is activated. 
 
     zwi --help
 
@@ -36,13 +36,13 @@ environjment is activated.
     zwi version
 
 The `version` function returns the version number of the currently
-installewd `zwi` package. 
+installed `zwi` package. 
 
 ## authentication
 
 Before you can do much of interest, you must store your authentication
 information in the local key store. For OsX, this is the system
-keychain.  For linux, it is something similar. 
+keychain.  For Linux, it is something similar. 
 
     zwi auth --help
     zwi auth --name=guest@example.com --password=SuperSecret123
@@ -50,7 +50,7 @@ keychain.  For linux, it is something similar.
 
 You can have the `auth` programme prompt for both `name` and
 `password`.  You need to enter the password twice, in that case, and
-it will not be stored unless it successfully aithenticates with the
+it will not be stored unless it successfully authenticates with the
 Zwift server. 
 
 ## verification
@@ -138,7 +138,7 @@ This was my second attempt at writing a gui to view some of the
 data. Currently, it only displays information from the `followers` and
 `followees` lists.
 
-Key Bingings (for OSX):
+Key Bindings (for OSX):
 
     CMD-1  Switch to `followers` table.
     CMD-2  Switch to `followees` table.
@@ -187,7 +187,7 @@ facilitates examination of the publicly available data.
 
 ## removing authentication information
 
-The `clear` function will remove any cached user/password information from the keystore.
+The `clear` function will remove any cached user/password information from the key-store.
 
 # development
 
