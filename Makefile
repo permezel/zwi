@@ -23,3 +23,8 @@ devel: publish
 install: publish
 	pip3 install --update zwi
 
+test:
+	which python
+	python --version
+	which pytest
+	pytest

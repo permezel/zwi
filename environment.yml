@@ -5,6 +5,7 @@ dependencies:
   - flit
 - python>=3.9
 - pip
+- pytest
 - keyring
 - pandas
 - click
