@@ -194,6 +194,14 @@ facilitates examination of the publicly available data.
 
 The `clear` function will remove any cached user/password information from the key-store.
 
+## worlds
+
+The `worlds` function will show how many users are signed in currently.
+
+	zwi worlds --help
+	zwi -v worlds
+	zwi worlds --poll
+
 # development
 
 I have been using `anaconda` on `OsX` for development.  Supposedly, this will install things

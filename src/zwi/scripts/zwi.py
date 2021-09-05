@@ -398,6 +398,69 @@ def devel():
     pass
 
 
+@click.option('--poll', is_flag=True,
+              help='poll repeatedly at specified interval')
+@click.option('--sleep', type=int, default=5*60,
+              help='sleep interval in seconds')
+@cli.command()
+def worlds(poll, sleep):
+    """Display info regarding worlds."""
+
+    if sleep < 1:
+        sleep = 1
+
+    (cl, _) = zwi.zwi_init(key='zwi.py')
+    lines = 0
+    while True:
+        # seems like there is only one worldID?
+        for i in range(1, 2):
+            w = None
+            p = None
+
+            try:
+                w = cl.get_world(world_id=i)
+                if w:
+                    p = w.players
+                    pass
+            except zwift.error.RequestException as e:
+                zwi.debug(1, f'{i=} {e=}')
+                pass
+
+            if w and p:
+                friends = 0
+                for f in p['friendsInWorld']:
+                    if f['followerStatusOfLoggedInPlayer'] != 'NO_RELATIONSHIP':
+                        friends += 1
+                        pass
+                    pass
+
+                zwi.debug(1, f'{i=} {p["worldId"]=} {p["playerCount"]=}')
+                if lines % 20 == 0:
+                    print('world players friends')
+                    pass
+                print(f'{i:5d} {p["playerCount"]:7d} {friends:7d}')
+                lines += 1
+
+                if zwi.verbosity:
+                    for f in p['friendsInWorld']:
+                        if f['followerStatusOfLoggedInPlayer'] != 'NO_RELATIONSHIP':
+                            print(f'{f["firstName"]} {f["lastName"]}')
+                            pass
+                        pass
+                    pass
+                pass
+            else:
+                print(f'{i=}: no world')
+                pass
+            pass
+        if poll:
+            time.sleep(sleep)
+            continue
+        else:
+            return 0
+        pass
+    pass
+
 # disable this ...
 # @cli.command()
 def test():
