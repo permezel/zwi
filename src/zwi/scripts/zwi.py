@@ -227,16 +227,28 @@ def pro_list():
         pass
     return 0
 
-@cli.command()
+
+def validate_prune(ctx, param, value):
+    if isinstance(value, str):
+        if value  == '' or len(value) == 1 and value in 'YN':
+            return value
+        raise click.BadParameter('must be "Y" or "N"')
+    raise click.BadParameter('funny type')
+
 @click.option('--skip', help='skip over the first N profile entries')
 @click.option('--zid', help='update just the profile entry for the given Zwift ID')
 @click.option('--seek', help='seek into the list of entries up to the specified Zwift ID')
-def pro_refresh(skip, zid, seek):
+@click.option('--prune', help='auto-prune all invalid entries (Y/N)',
+              type=str, callback=validate_prune, default='', prompt=False)
+@cli.command()
+def pro_refresh(skip, zid, seek, prune):
     """Refresh local profile DB from Zwift."""
     skip = 0 if skip is None else int(skip)
 
     pro = ZwiPro()
     pr = pro.Printer()
+    delete = 'n' if prune == '' else prune
+    count = 0
 
     for p in pro:
         if skip > 0:
@@ -248,11 +260,34 @@ def pro_refresh(skip, zid, seek):
         if seek is not None and int(seek) != int(p.id):
             continue
 
-        q = p.update(pro)
+        count += 1
+
         pr.out(p)
+        q = p.refresh(pro)
         if q is None:
             # Sometimes the update fails.
-            print(f'skipping {p.id}')
+            ch = delete
+            while delete == 'n':
+                click.echo('delete entry? [ynYN?] ', nl=False)
+                ch = click.getchar()
+                click.echo()
+                if ch == '?':
+                    click.echo('\n'.join((f"y - delete one ({p.id})",
+                                          f"n - don't delete one ({p.id})",
+                                          "Y - delete all failing",
+                                          "N - do not delete any failing",
+                                          "? - help!")))
+                elif ch in 'ynYN':
+                    if ch in 'YN':
+                        delete = ch
+                        pass
+                    break
+                pass
+            if ch in 'yY':
+                zwi.verbo(0, f'deleting {p.firstName} {p.lastName}')
+                pro.delete(p.id)
+                pass
+            pass
         elif p is not q and p != q:
             pr.out(q, prefix='*')
             zwi.verbo(1, f'{p.last_difference}')
@@ -261,6 +296,9 @@ def pro_refresh(skip, zid, seek):
         if zid: break
         if seek: seek = None
         pass
+
+    if zid and count != 1:
+        raise SystemExit(f'{zid} not found in local profile DB.')
     return 0
 
 

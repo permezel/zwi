@@ -5,14 +5,15 @@
 # Move the Zwi common stuff into a package
 #
 """Zwi core stuff."""
-import sys
 import os
+import urllib3
 import sqlite3 as sq
 from datetime import datetime
 from dataclasses import dataclass, fields
-from .util import Error, error, debug, verbo, debug_p, verbo_p
+from .util import Error, debug, verbo, verbo_p
 
 try:
+    import zwift
     from zwift import Client
     import keyring
 except Exception as __ex:
@@ -94,6 +95,8 @@ def auth(name, password, key='zwi.py'):
         else:
             pr = cl.get_profile()
             pr.check_player_id()
+    except urllib3.exceptions.HTTPError as e:
+        raise SystemExit(f'Cannot connect to Zwift: {e}')
     except ConnectionError as e:
         raise SystemExit(f'Cannot connect to Zwift: {e}')
     except Exception as e:
@@ -163,14 +166,16 @@ def zwi_init(zid='me', key='zwi.py'):
         cl = Client(name, password)
         pr = cl.get_profile()
         pr.check_player_id()
-        print('player_id:', pr.player_id)
+        debug(1, f'player_id: {pr.player_id}')
         _zwi_auth_cache[zid] = [cl, pr]
         return cl, pr
+    except urllib3.exceptions.HTTPError as e:
+        raise SystemExit(f'Cannot connect to Zwift: {e}')
     except ConnectionError as e:
-        raise SystemExit('Cannot connect to Zwift: {e}.')
+        raise SystemExit(f'Cannot connect to Zwift: {e}.')
     except Exception as e:
         print('Error:', e)
-        raise SystemExit('Authentication failure for user {name}.')
+        raise SystemExit(f'Authentication failure for user {name}.')
     pass
 
 
@@ -178,66 +183,48 @@ class DataBase(object):
     cache = {}  # DB universe
 
     def __init__(self, path=None, reset=False, create=False):
-        self._path = path  # = DataBase.db_path(path)
+        self._path = path
         self._cur = None
 
-        debug(2, f'init {self=} {self._path=} {DataBase.cache=}')
-
-        if path in DataBase.cache:
-            if reset:
-                del DataBase.cache[path]
-            else:
-                raise Error(f'Programming error: {path} already exists in cache.')
-            pass
+        # programming error if extant
+        assert path is not None
+        assert path not in DataBase.cache
 
         self._db = DataBase.__db_connect(path, reset, create)
-        super().__init__()
-
+        assert self._db
         DataBase.cache[path] = self
         pass
-
-    def __del__(self):
-        debug(2, f'del {self=} {self._path=} {DataBase.cache=}')
-        if self._path in DataBase.cache:
-            del DataBase.cache[self._path]
-            pass
 
     @staticmethod
     def __db_connect(path, reset=False, create=False):
         """Setup DB for access."""
 
-        debug(2, f'{path=} {reset=} {create=}')
+        # require creation of new DB to be explicit
         if not create and not os.path.isfile(path):
             raise SystemExit(f'Database file {path} does not exist.')
 
         if reset and os.path.isfile(path):
-            try:
-                os.remove(path)
-            except Exception as e:
-                # print(f'Error: {e}')
-                raise e
+            os.remove(path)
             pass
 
         if reset or path not in DataBase.cache:
-            try:  # first, try to create the DB
-                db = sq.connect(path)
-            except Exception as e:
-                print(f'{path=}')
-                raise e
-            DataBase.cache[path] = db
+            db = sq.connect(path)
             pass
-        return DataBase.cache[path]
+        return db
 
     @classmethod
     def db_connect(cls, path=None, reset=False, create=False):
         """Connect to a database."""
         path = get_zpath(mkdir=create) if path is None else path
-        debug(2, f'db_connect: {path=} {reset=} {create=}')
+
         if path not in cls.cache:
             return DataBase(path=path, reset=reset, create=create)
-        else:
-            return cls.cache[path]
-        pass
+
+        obj = cls.cache[path]
+        if reset:   # reset extand DB, retaining object
+            obj._db = cls.__db_connect(path, reset=reset, create=create)
+            pass
+        return obj
 
     @property
     def db(self):
@@ -280,8 +267,7 @@ class DataBase(object):
         pass
 
     def drop_table(self, name):
-        self.execute(f'DROP TABLE IF EXISTS {name};')
-        return
+        return self.execute(f'DROP TABLE IF EXISTS {name};')
 
     def create_table(self, name, cols):
         exe = f"CREATE TABLE IF NOT EXISTS {name}({', '.join(cols)});"
@@ -300,6 +286,13 @@ class DataBase(object):
         debug(2, f'{cols=}')
         debug(2, f'{vals=}')
         exe = f'''REPLACE INTO {name} ({', '.join(cols)}) VALUES({', '.join(vals)});'''
+        self.execute(exe)
+        self.commit()
+        return
+
+    def row_delete(self, name, col, val):
+        debug(2, f'row_delete: {name=} {col=} {val=}')
+        exe = f'DELETE FROM {name} WHERE {col} = {val};'
         self.execute(exe)
         self.commit()
         return
@@ -327,13 +320,19 @@ class DataBase(object):
         return self.db.commit()
 
     def close(self):
-        self._cur.close()
-        del self._cur
-        self._cur = None
-        self._db.close()
-        del self._db
-        self._db = None
-
+        if self._cur:
+            self._cur.close()
+            del self._cur
+            self._cur = None
+            pass
+        if self._db:
+            self._db.close()
+            del self._db
+            self._db = None
+            pass
+        assert self._path in DataBase.cache
+        del DataBase.cache[self._path]
+        pass
     pass
 
 
@@ -434,7 +433,7 @@ class ZwiBase(object):
                     debug(2, f'dict: {f0=} {arg[x.name]=}')
                     f0.traverse(ZwiBase.from_dict, arg[x.name])
                 else:
-                    raise SystemExit(f'oops')
+                    raise SystemExit('oops')
                 pass
             else:
                 raise SystemExit(f'Unexpected type: {x.type=}')
@@ -848,8 +847,9 @@ class ZwiProfile(ZwiBase):
 
         return self.traverse(fun, list())
 
-    def update(self, pro):
-        """Update local cached values from Zwift."""
+
+    def refresh(self, pro):
+        """Refresh local cached values from Zwift."""
         return pro.refresh(self)
     pass
 
@@ -913,7 +913,6 @@ class ZwiUser(object):
         if drop:
             self._db.drop_table('followers')
             self._db.drop_table('followees')
-            self._db.drop_table('enum')  # XXX: not here
             pass
 
         self._db.create_table('followers', ZwiFollowers.column_names(create=True, pk='followerId'))
@@ -929,8 +928,8 @@ class ZwiUser(object):
             wees_dict = {}
             self._slurp(wers, wers_dict, werid, 'followers')
             self._slurp(wees, wees_dict, weeid, 'followees')
-            self.update(wers, wers_dict, werid, 'followers', self.wers_fac, self.wers_cmp)
-            self.update(wees, wees_dict, weeid, 'followees', self.wees_fac, self.wees_cmp)
+            self.update(wers, wers_dict, werid, 'followers', self.wers_fac, self.wers_cmp, self.wers_del)
+            self.update(wees, wees_dict, weeid, 'followees', self.wees_fac, self.wees_cmp, self.wees_del)
             pass
 
         self._slurp(self._wers, self._wers_dict, werid, 'followers')
@@ -939,21 +938,19 @@ class ZwiUser(object):
             cnt = 0
             for r in self._wers:
                 self._pro.update(r[werid])
-                if verbo_p(0):
-                    print(f'\rupdate profile of followers: {cnt}', end='')
-                    pass
+                verbo(0, f'\rupdate profile of followers: {cnt}', end='')
                 cnt += 1
                 pass
-            verbo(0, '')
+            if cnt: verbo(0, '')
+            #  prefer? verbo((-1,0)[bool(cnt)], '')
+
             cnt = 0
             for r in self._wees:
                 self._pro.update(r[weeid])
-                if verbo_p(0):
-                    print(f'\rupdate profile of followees: {cnt}', end='')
-                    pass
+                verbo(0, f'\rupdate profile of followees: {cnt}', end='')
                 cnt += 1
                 pass
-            verbo(0, '')
+            verbo((-1,0)[bool(cnt)], '')
             pass
         pass
 
@@ -965,16 +962,12 @@ class ZwiUser(object):
             cache.append(r)
             ns[r[idx]] = r
             count = count + 1
-            if count <= 10 and verbo_p(2):
-                verbo(3, f'{r=}')
-            elif verbo_p(1):
-                print(f'\rslurped {tab}: {count}', end='')
-                pass
+            verbo(1, f'\rslurped {tab}: {count}', end='')
             pass
         if count: verbo(1, '')
         pass
 
-    def update(self, cache, ns, idx, tab, factory, compare):
+    def update(self, cache, ns, idx, tab, factory, compare, delete):
         if self._pr is None:
             self._cl, self._pr = zwi_init()
             if self._uid is None:
@@ -982,7 +975,9 @@ class ZwiUser(object):
                 pass
             pass
 
+        sym = self._cols[idx]
         vec = []
+        dic = {}
         start = 0
         while True:
             fe = self._pr.request.json(f'/api/profiles/{self._uid}/{tab}?start={start}&limit=200')
@@ -992,14 +987,9 @@ class ZwiUser(object):
             for f in fe:
                 start += 1
                 vec.append(f)
-                if False and start > 1:
-                    break
+                dic[f[sym]] = f
                 pass
-            if verbo_p(1):
-                print(f'\rupdate: processed {tab}: {start}', end='')
-                pass
-            if False and start > 1:
-                break
+            verbo(1, f'\rupdate: processed {tab}: {start}', end='')
             pass
         if start: verbo(1, '')
 
@@ -1007,18 +997,31 @@ class ZwiUser(object):
         # It appears that more recent followers are returned first above.
         vec.reverse()
 
+        # Check to see if there are any deletions
+        hdr = f'No longer in {tab}:\n'
+        for r in cache:
+            zid = r[idx]
+            if not zid in dic.keys():
+                r = factory(r)
+                print(f'{hdr}      {r.profile.firstName} {r.profile.lastName}')
+                hdr = ''
+                delete(zid)
+                pass
+            pass
+
         start = 0
+        hdr = f'Updating {tab}:\n'
         for v in vec:
             w = factory(v)
             fun = compare(w, ns)
             if fun is not None:
+                print(f'{hdr}      {w.profile.firstName} {w.profile.lastName}')
+                hdr = ''
                 w.addDate = f'{datetime.now().isoformat(timespec="minutes")}'
                 fun(tab, w.column_names(), w.column_values())
                 pass
             start += 1
-            if verbo_p(1):
-                print(f'\rupdate: processed {tab}: {start}', end='')
-                pass
+            verbo(1, f'\rupdate: processed {tab}: {start}', end='')
             pass
         if start: verbo(1, '')
         return
@@ -1054,6 +1057,12 @@ class ZwiUser(object):
             return self._db.row_replace
         pass
 
+    def wers_del(self, fid):
+        return self._db.row_delete('followers', 'followerId', fid)
+
+    def wees_del(self, fid):
+        return self._db.row_delete('followees', 'followeeId', fid)
+
     pass
 
 
@@ -1079,6 +1088,13 @@ class ZwiPro(object):
         """The iterator returns the set ZwiProfile() in the self._pro cache."""
         return (ZwiProfile.from_seq(x) for x in self._pro)
 
+    @property
+    def pr(self):
+        if not self._pr:
+            self._cl, self._pr = zwi_init()
+            pass
+        return self._pr
+    
     @property
     def cols(self):
         return self._cols
@@ -1134,71 +1150,86 @@ class ZwiPro(object):
             return rv
         return self.update(zid) if fetch else None
 
+    def fetch_profile(self, zid):
+        count = 0
+        while True:
+            try:
+                rsp = self.pr.request.json(f'/api/profiles/{zid}')
+            except zwift.error.RequestException as e:
+                # This is derived from BaseExeption, not Exception...
+                print(f'error trying to obtain profile for {zid}: {e}')
+                rsp = None
+            except ConnectionError as e:
+                #  retry this some #  of times
+                count += 1
+                if count < 8:
+                    print(f'retry: {count} of Connection reset trying to obtain profile for {zid}: {e}')
+                    continue
+                raise SystemExit(f'Connection reset trying to obtain profile for {zid}: {e}')
+            except Exception as e:
+                print(f'{type(e)} {e}')
+                raise SystemExit(f'Some error trying to update id {zid}.')
+            return rsp
+        pass
+
     def update(self, zid=None, force=False):
         """Update the profile for `zid` if not currently in the DB.
         If force is set, we update regardless.
         """
-        if self._pr is None:
-            self._cl, self._pr = zwi_init()
-            pass
-        zid = self._pr.player_id if zid is None else zid
+        zid = self.pr.player_id if zid is None else zid
 
         if force is False and zid in self._lookup:
             return None
 
-        try:
-            rsp = self._pr.request.json(f'/api/profiles/{zid}')
-            new = ZwiProfile.from_zwift(rsp)
-            new.addDate = f'{datetime.now().isoformat(timespec="minutes")}'
-            # update cache
-            rsp[self._cols.index('addDate')] = new.addDate
-            if zid in self._lookup:
-                self._pro[self._lookup[zid]] = rsp
-            else:
-                self._pro.append(rsp)
-                self._lookup[zid] = len(self._pro) - 1
-                pass
-            self._db.row_replace('profile', new.column_names(), new.column_values())
-            return new
-        except Exception as e:
-            print(f'{e}')
-            print(f'Some error trying to update id {zid}.')
+        rsp = self.fetch_profile(zid)
+        if rsp is None:
+            return None
+
+        new = ZwiProfile.from_zwift(rsp)
+        new.addDate = f'{datetime.now().isoformat(timespec="minutes")}'
+        # update cache
+        rsp[self._cols.index('addDate')] = new.addDate
+        if zid in self._lookup:
+            self._pro[self._lookup[zid]] = rsp
+        else:
+            self._pro.append(rsp)
+            self._lookup[zid] = len(self._pro) - 1
             pass
-        return None
+        self._db.row_replace('profile', new.column_names(), new.column_values())
+        return new
 
     def refresh(self, old):
-        """Refresh local cache entry from Zwift."""
+        """Refresh local DB entry from Zwift."""
         assert old.id in self._lookup
 
-        if self._pr is None:
-            self._cl, self._pr = zwi_init()
+        rsp = self.fetch_profile(old.id)
+        if rsp is None:
+            return None
+
+        debug(1, f'/api/profiles/{old.id} => {rsp}')
+        new = ZwiProfile.from_zwift(rsp)
+        debug(1, f'from_zwift => {new=}')
+
+        debug(1, f'{old=}')
+        if old == new:
+            return old
+        else:
+            debug(1, f'{old.last_difference=}')
             pass
 
-        try:
-            rsp = self._pr.request.json(f'/api/profiles/{old.id}')
-            debug(1, f'/api/profiles/{old.id} => {rsp}')
-            new = ZwiProfile.from_zwift(rsp)
-            debug(1, f'from_zwift => {new=}')
+        new.addDate = f'{datetime.now().isoformat(timespec="minutes")}'
+        # update cache
+        rsp[self._cols.index('addDate')] = new.addDate
+        self._pro[self._lookup[old.id]] = rsp
+        # update DB
+        self._db.row_replace('profile', new.column_names(), new.column_values())
+        return new
 
-            debug(1, f'{old=}')
-            if old == new:
-                return old
-            else:
-                debug(1, f'{old.last_difference=}')
-                pass
+    def delete(self, zid):
+        """delete entry from local DB."""
+        self._db.row_delete('profile', 'id', zid)
+        pass
 
-            new.addDate = f'{datetime.now().isoformat(timespec="minutes")}'
-            # update cache
-            rsp[self._cols.index('addDate')] = new.addDate
-            self._pro[self._lookup[old.id]] = rsp
-            # update DB
-            self._db.row_replace('profile', new.column_names(), new.column_values())
-            return new
-        except Exception as e:
-            print(f'{e}')
-            print(f'Some error trying to update id {old.id}.')
-            pass
-        return None
 
     class Printer():
         fmt = [ ('date',     ('{:18.18s} ',  '{p.addDate:18.18s} ')),
