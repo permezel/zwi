@@ -7,7 +7,6 @@ import os
 import sys
 import time
 
-import zwi
 from zwi import ZwiPro, ZwiUser, DataBase, get_zdir
 
 # Was messing about trying to determine if I should use Qt or Tk.
@@ -18,26 +17,32 @@ from zwi import ZwiPro, ZwiUser, DataBase, get_zdir
 # This functionality may end up being replaced with Bokeh.
 #
 
+
 def qt_gui():
     """Qt based GUI to display info from followers/followees lists."""
+    # ensure zwi.db is extant
+    DataBase.db_connect(reset=False, create=False)
 
     try:
-        import PyQt5
-        from PyQt5.QtWidgets import QApplication
         from PyQt5.QtGui import QPalette, QColor
-        from PyQt5 import QtCore, QtGui, QtWidgets, uic
-        from PyQt5.QtWidgets import QApplication, QWidget, QPushButton, QVBoxLayout, QTableWidget
-        from PyQt5.QtCore import (pyqtSignal, QPointF, QRect, QSize, Qt, QTimer,
-                                  QFile,
-                                  QRunnable, QThreadPool, QMutex, QSemaphore)
-        from PyQt5.QtGui import (QPainter, QPolygonF, QIcon, QPixmap, QBrush, QPen, QColor, QFont)
-        from PyQt5.QtWidgets import (QAbstractItemView, QApplication, QStyle,
-                                     QStyledItemDelegate, QTableWidget, QTableWidgetItem, QWidget,
+        from PyQt5 import QtWidgets, uic
+        from PyQt5.QtWidgets import (QApplication, QWidget, QPushButton,
+                                     QVBoxLayout, QTableWidget,
+                                     QAbstractItemView, QApplication, QStyle,
+                                     QStyledItemDelegate, QTableWidget,
+                                     QTableWidgetItem, QWidget,
                                      QGridLayout,
                                      QDialog, QLineEdit, QMessageBox,
                                      QMainWindow,
                                      QGraphicsScene,
                                      QStyleOptionViewItem)
+        from PyQt5.QtCore import (pyqtSignal, QPointF, QRect, QSize,
+                                  Qt, QTimer,
+                                  QFile,
+                                  QRunnable, QThreadPool, QMutex, QSemaphore)
+        from PyQt5.QtGui import (QPainter, QPolygonF, QIcon,
+                                 QPixmap, QBrush, QPen, QColor, QFont)
+
     except Exception as e:
         print('import error:', e)
         print('pip3 install pyqt5')
@@ -92,7 +97,7 @@ def qt_gui():
         def autoDelete(self):
             print(f'autodel: {self=}')
             return False
-        
+
         def stop(self):
             while True:
                 self._mux.lock()
@@ -219,7 +224,7 @@ def qt_gui():
             self.setupUi(self)
             self.setup()
             pass
-    
+
         def setup(self):
             self._timer = None
             self._status = self.statusBar()
@@ -257,7 +262,7 @@ def qt_gui():
             # self.refresh must keep _idx in range
             self.refresh(0, fromsb=True)
             pass
-                
+
         def doWees(self):
             self.switch('wees')
             pass
@@ -309,7 +314,7 @@ def qt_gui():
             """Reset the image cache."""
             self._icache = ImageCache(self.sig)
             pass
-            
+
         def doResetDBase(self):
             """Reset the local data base cache of Zwift data."""
             db = DataBase.db_connect(reset=True)
@@ -320,15 +325,15 @@ def qt_gui():
         def doResetAuthen(self):
             """(eventually)Reset the Zwift user authentication."""
             return self.message('Use `zwi clear` to reset the Zwift user authentication.')
-            
+
         def doSortFirstName(self):
             self.doSort('firstName')
             pass
-        
+
         def doSortLastName(self):
             self.doSort('lastName')
             pass
-        
+
         def doSortPlayerType(self):
             self.doSort('playerType')
             pass
@@ -336,7 +341,7 @@ def qt_gui():
         def doSortCountry(self):
             self.doSort('countryAlpha3')
             pass
-        
+
         def doSort(self, col):
             """Sort current table by country."""
             idx = self._usr.cols.index(col)
@@ -349,7 +354,7 @@ def qt_gui():
             self._idx = 0
             self.refresh(0)
             pass
-            
+
         def doSearch(self):
             """(eventually) search."""
             return self.message('Yet to be implemented.')
@@ -359,7 +364,7 @@ def qt_gui():
             f = QMessageBox(parent=self)
             f.setText(msg)
             return f.exec_()
-            
+
         def close(self):
             if self._timer:
                 self._timer.stop()
@@ -387,7 +392,7 @@ def qt_gui():
             self.setWindowTitle(f'ZwiView -- follo{which}')
             self.refresh(0)
             pass
-        
+
         def refresh(self, delta=0, fromsb=False):
             self._idx += delta
             if self._idx > self._max:
@@ -395,17 +400,17 @@ def qt_gui():
             elif self._idx < 0:
                 self._idx = self._max
                 pass
-                
+
             if fromsb == False:
                 self.sb.setValue(self._idx)
                 pass
-            
+
             try:
                 r = self._data[self._idx]
             except Exception as e:
                 print(f'{e=} {self._idx=} {self._max=} {len(self._data)=}')
                 return
-            
+
             d = dict(zip(self._usr.cols, r))
             self.firstName.setText(d['firstName'])
             self.lastName.setText(d['lastName'])
@@ -424,7 +429,7 @@ def qt_gui():
 
             self.country.setText(f'''     country: {d['countryAlpha3']}''')
             self.rtype.setText(  f'''player type: {d['playerType']}''')
-            
+
             boo = (d['followeeStatusOfLoggedInPlayer'] != d['followerStatusOfLoggedInPlayer'])
             url = d['imageSrc']
             if d == 'None':
@@ -462,9 +467,9 @@ def qt_gui():
                 self._status.showMessage(f'{1+self._idx}')
                 pass
             pass
-            
+
         pass
-    
+
 
     app = QtWidgets.QApplication([])
     # Force the style to be the same on all OSs:
@@ -491,5 +496,3 @@ def qt_gui():
     window.show()
     sys.exit(app.exec_())
     pass
-
-

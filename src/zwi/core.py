@@ -167,10 +167,10 @@ def zwi_init(zid='me', key='zwi.py'):
         _zwi_auth_cache[zid] = [cl, pr]
         return cl, pr
     except ConnectionError as e:
-        raise SystemExit('Cannot connect to Zwift: {e}.')
+        raise SystemExit(f'Cannot connect to Zwift: {e}.')
     except Exception as e:
         print('Error:', e)
-        raise SystemExit('Authentication failure for user {name}.')
+        raise SystemExit(f'Authentication failure for user {name}.')
     pass
 
 
@@ -898,7 +898,7 @@ class ZwiUser(object):
     def wers_iter(self):
         """Construct an iterator to produce the wers as ZwiFollowers objects."""
         return (ZwiFollowers.wers(x) for x in self._wers)
-        
+
     def _setup(self, drop, update, uid):
         """Syncronise with the local DB version of the world."""
         if self._db is None:  # attach to the usual DB
@@ -1120,7 +1120,7 @@ class ZwiPro(object):
     def lookup(self, zid, fetch=False):
         """Lookup `zid` in cache, converting to ZwiProfile if found.
         Inputs:
-          zid   - Zwift user-id 
+          zid   - Zwift user-id
           fetch - fetch from Zwift if not in cache (update DB)
         """
         if zid in self._lookup:
@@ -1224,7 +1224,7 @@ class ZwiPro(object):
                     pass
                 pass
             pass
-        
+
         def out_hdr(self, prefix):
             """Output the header."""
             print(prefix, end='')
@@ -1241,7 +1241,7 @@ class ZwiPro(object):
                 print(eval("f'" + self.fmt[idx][1][1] +"'"), end='')
                 pass
             print('')
-            
+
         def out(self, p, prefix=' '):
             if p is None: return	# accept None objects
 
@@ -1250,7 +1250,7 @@ class ZwiPro(object):
                 print(self.title)
                 self.title = None
                 pass
-                
+
             self.line_cnt += 1
             if self.line_cnt % 32 == 1:
                 self.out_hdr(' ')

@@ -5,58 +5,63 @@ Here are some small python programmes to facilitate viewing Zwift data.
 
 # requirements
 
-    a Zwift user account
-    python3.9 or later
-    pip3
+	a Zwift user account
+	python3.9 or later
+	pip3
 
 # usage
 
 The easiest way to use this is to use `pip3 install` to install
 everything you need. Prior to that, you should probably have done
-something like: 
+something like:
 
-    ZWI_ENV=/tmp/zwi_env
-    python3 --version
-    python3 -m venv ${ZWI_ENV}
-    . ${ZWI_ENV}/bin/activate
+	ZWI_ENV=/tmp/zwi_env
+	python3 --version
+	python3 -m venv ${ZWI_ENV}
+	. ${ZWI_ENV}/bin/activate
+
+If using anaconda:
+
+	conda create -n zwi python=3.9
+	conda activate zwi
 
 At this point, you will have a dedicated play area to install `zwi`
-and dependencies. 
+and dependencies.
 
-    pip3 install zwi
+	pip3 install zwi
 
 This will install everything required, and place two command scripts
 in `${ZWI_ENV}/bin` which will be in your `${PATH}` while the
-environment is activated. 
+environment is activated.
 
-    zwi --help
+	zwi --help
 
 ## version
 
-    zwi version
+	zwi version
 
 The `version` function returns the version number of the currently
-installed `zwi` package. 
+installed `zwi` package.
 
 ## authentication
 
 Before you can do much of interest, you must store your authentication
 information in the local key store. For OsX, this is the system
-keychain.  For Linux, it is something similar. 
+keychain.  For Linux, it is something similar.
 
-    zwi auth --help
-    zwi auth --name=guest@example.com --password=SuperSecret123
-    zwi auth
+	zwi auth --help
+	zwi auth --name=guest@example.com --password=SuperSecret123
+	zwi auth
 
 You can have the `auth` programme prompt for both `name` and
 `password`.  You need to enter the password twice, in that case, and
 it will not be stored unless it successfully authenticates with the
-Zwift server. 
+Zwift server.
 
 ## verification
 
-    zwi check --help
-    zwi check
+	zwi check --help
+	zwi check
 
 The `check` function will verify that the stored credentials function.
 At times on MacOS, the keychain decides it doesn't like you any more
@@ -71,31 +76,31 @@ database cache with information from Zwift.  `zwi` maintains state in
 `${HOME}/.zwi/`.  An `sqlite3` database is used to cache the state of
 the user's `followers` and `followees` lists. In addition, the
 profiles of all Zwift users encountered (via the
-`followers`/`followees` lists) are saved in a separate database. 
+`followers`/`followees` lists) are saved in a separate database.
 
-    zwi reset --help
-    zwi reset
+	zwi reset --help
+	zwi reset
 
 The `reset` function deletes the `${HOME}/.zwi/zwi.db` database file
 if it exists, creates the `sqlite3` database, and populates the
-database with the `followers` and `followees` tables. 
+database with the `followers` and `followees` tables.
 It will not delete the profiles database, but it will ensure that
 there are profile entries for each user in the `followers` and
 `followees` lists.
 
 ## update followers/followees database
 
-    zwi update --help
-    zwi -v update
+	zwi update --help
+	zwi -v update
 
 The `update` function refreshes the `followers` and `followees` information.
 (Currently, this function is being fleshed out.  It does not yet
-report any differences. Also, it fails to process deletions.) 
+report any differences. Also, it fails to process deletions.)
 
 ## update profile database
 
-    zwi pro-update --help
-    zwi [-v] pro-update [--force]
+	zwi pro-update --help
+	zwi [-v] pro-update [--force]
 
 The `pro-update` function will update the local DB profile cache using
 information in the local Zwift user `followers` and `followees` DB
@@ -103,14 +108,14 @@ cache.
 
 ## list profile database entries
 
-    zwi pro-list --help
-    zwi pro-list
+	zwi pro-list --help
+	zwi pro-list
 
 The profiles list can be displayed.
 
 ## bokeh
 
-    zwibok serve [--port=#]
+	zwibok serve [--port=#]
 
 The `profile` database can be viewed using the `zwibok` app.
 This will pop up a page on your browser allowing you to explore
@@ -129,8 +134,8 @@ pertaining to the user.
 
 ## gui
 
-    zwi gui --help
-    zwi gui
+	zwi gui --help
+	zwi gui
 
 The `gui` function pops up a window displaying data from the local
 database copy of the Zwift `followers` and `followees` tables.
@@ -140,18 +145,18 @@ data. Currently, it only displays information from the `followers` and
 
 Key Bindings (for OSX):
 
-    CMD-1  Switch to `followers` table.
-    CMD-2  Switch to `followees` table.
-    CMD-a  Toggle `auto` mode.
-    CMD-n  Move to next entry.
-    CMD-p  Move to previous entry.
-    CMD-f  Search (not yet implemented).
-    CMD-q  Quit
+	CMD-1  Switch to `followers` table.
+	CMD-2  Switch to `followees` table.
+	CMD-a  Toggle `auto` mode.
+	CMD-n  Move to next entry.
+	CMD-p  Move to previous entry.
+	CMD-f  Search (not yet implemented).
+	CMD-q  Quit
 
 If `auto` mode is enabled:
 
-    CMD-n  increase interval
-    CMD-p  decrease interval
+	CMD-n  increase interval
+	CMD-p  decrease interval
 
 The slider at the bottom can be used to move rapidly thru the list.
 
@@ -159,8 +164,8 @@ For Linux, it appears the key bindings map to the CTRL key.  The menu items will
 
 ## followees
 
-    zwi wees --help
-    zwi wees
+	zwi wees --help
+	zwi wees
 
 The `wees` function will check the cached followees list (them who's followed).
 Any subject who is being followed but who is not reciprocating is displayed.
@@ -168,8 +173,8 @@ You will have to manually search for the user in the Zwift companion and decide 
 
 ## followers
 
-    zwi wers --help
-    zwi wers
+	zwi wers --help
+	zwi wers
 
 The `wers` function will check the cached followers list and display any lacking reciprocity.
 Certain users will follow you, but not respond to reciprocal follow requests, remaining forever in limbo.
@@ -181,9 +186,9 @@ As above, as far as I know, one has to use the Zwift companion app to search by 
 Per the Zwift privacy policy, various data are publicly accessible.  The `inspect` command
 facilitates examination of the publicly available data.
 
-    zwi inspect --help
-    zwi inspect --zid=ZwiftUser
-    zwi -v inspect --zid=ZwiftUser --update
+	zwi inspect --help
+	zwi inspect --zid=ZwiftUser
+	zwi -v inspect --zid=ZwiftUser --update
 
 ## removing authentication information
 
@@ -194,18 +199,18 @@ The `clear` function will remove any cached user/password information from the k
 I have been using `anaconda` on `OsX` for development.  Supposedly, this will install things
 to facilitate development:
 
-    conda env create -f environment.yml
-    conda activate zwi
-    flit install --symlink
-    pip3 install zwift-client
-    pip3 install PyQt5
+	conda env create -f environment.yml
+	conda activate zwi
+	flit install --symlink
+	pip3 install zwift-client
+	pip3 install PyQt5
 
 # hints
 
 When manually deleting followees, using the Zwift companion app, and
 searching by name, I find it helps to type in the bits of the name
 which are more likely to be unique, so as to limit the lists
-presented. 
+presented.
 
 # user feedback
 

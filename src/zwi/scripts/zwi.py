@@ -3,19 +3,16 @@
 # Copyright (c) 2021 Damon Anton Permezel, all bugs revered.
 
 import sys
-import os
 import signal
-import random
-import time
 import zwi
 from zwi import ZwiPro, ZwiUser, DataBase, get_zdir
-from dataclasses import dataclass
 
 try:
     import click
 except Exception as ex__:
     print('import error', ex__)
     raise SystemExit('please run: pip3 install click')
+
 
 @click.option('-v', '--verbose', count=True)
 @click.option('-d', '--debug', count=True)
@@ -24,11 +21,13 @@ def cli(verbose, debug):
     zwi.setup(verbose, debug)
     pass
 
+
 @cli.command()
 def version():
     """Return the version number of the `zwi` package."""
     print(zwi.__version__)
     return
+
 
 @cli.command()
 @click.option('--name', prompt='Enter Zwift username', help='Zwift username')
@@ -60,6 +59,7 @@ def wees():
 def wers():
     """Display followers who I am not following."""
     return followers(ZwiUser())
+
 
 def followees(usr):
     count = 0
@@ -156,6 +156,7 @@ def update():
 
     return 0
 
+
 @cli.command()
 @click.option('--force', is_flag=True, help='Force refresh.')
 def pro_update(force):
@@ -208,7 +209,7 @@ def pro_update(force):
 
     return 0
 
-        
+
 @cli.command()
 def pro_list():
     """List profile DB contents."""
@@ -226,6 +227,7 @@ def pro_list():
         pr.out(p)
         pass
     return 0
+
 
 @cli.command()
 @click.option('--skip', help='skip over the first N profile entries')
@@ -274,17 +276,18 @@ def gui():
         print('import error:', e)
         raise SystemExit(e)
 
-    
+
 @cli.command()
 @click.option('--zid', prompt='Zwift user ID', help='Zwift ID to inspect')
-@click.option('--update', is_flag=True, help='update existing DB entries from Zwift')
+@click.option('--update', is_flag=True,
+              help='update existing DB entries from Zwift')
 def inspect(zid, update):
     """Inspect Zwift user `zid` and slurp down the followers/followees."""
 
     if zwi.verbo_p(1):
         skip = []
     else:
-        skip=['date', 'hours', 'distance', 'climbed', 'bike']
+        skip = ['date', 'hours', 'distance', 'climbed', 'bike']
         pass
 
     zwi.verbo(1, f'Inspecting user {zid}')
@@ -302,13 +305,14 @@ def inspect(zid, update):
     for f in pseudo.wers_iter():
         pr.out(pro.lookup(f.followerId))
         pass
-    
+
     pr = pro.Printer(f'followees of {vic.firstName} {vic.lastName}', skip=skip)
     for f in pseudo.wees_iter():
         pr.out(pro.lookup(f.followeeId))
         pass
 
     return 0
+
 
 # disable this ...
 # @cli.command()
@@ -339,7 +343,7 @@ def devel():
     zwi.verbo(0, '')
 
     zwi.setup(1, zwi.debug_lvl)
-    
+
     count = 0
     for r in pro._pro:
         d = dict(zip(pro.cols, r))
@@ -353,7 +357,7 @@ def devel():
         pass
     pass
 
-    
+
 # disable this ...
 # @cli.command()
 def test():
@@ -361,13 +365,13 @@ def test():
     import flask
     from flask import Flask, redirect, send_file
     from markupsafe import escape
-    
+
     def process(self, wrk):
         """Process completed URL fetch."""
         print(f'process: {wrk=}')
         url = wrk[0]
         pass
-    
+
     def callback(cache):
         """This callback is called in the worker thread."""
         print(f'callback: {cache=}')
@@ -386,7 +390,7 @@ def test():
     @app.route('/images/<img>')
     def images(img):
         print(f'images: {escape(img)}')
-            
+
         try:
             fna = cache.load('https://static-cdn.zwift.com/prod/profile/' + img, {})
             if fna:
@@ -406,8 +410,9 @@ def test():
 
     return 0
 
-def keyboardInterruptHandler(signal, frame):
-    print("KeyboardInterrupt (signal: {}) has been caught. Cleaning up...".format(signal))
+
+def keyboardInterruptHandler(sig, frame):
+    print(f'KeyboardInterrupt (signal: {sig}) has been caught. Cleaning up.')
     sys.exit(0)
 
 
@@ -417,7 +422,7 @@ def keyboardInterruptHandler(signal, frame):
 #
 signal.signal(signal.SIGINT, keyboardInterruptHandler)
 
-# if __name__ == '__main__':
+
 def main():
     try:
         cli()
