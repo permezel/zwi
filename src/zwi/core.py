@@ -904,7 +904,9 @@ class ZwiUser(object):
         if self._db is None:  # attach to the usual DB
             if uid is not None:
                 # put into a different data base
-                self._db = DataBase.db_connect(get_zpath(subdir=f'{uid}', mkdir=update), create=update)
+                self._db = DataBase.db_connect(get_zpath(subdir=f'{uid}',
+                                                         mkdir=update),
+                                               create=update)
             else:
                 self._db = DataBase.db_connect(create=update)
                 pass
@@ -1071,14 +1073,14 @@ class ZwiPro(object):
     Seems we can get profile data given user id.
     """
 
-    def __init__(self, db=None, drop=False, update=False):
+    def __init__(self, db=None, drop=False, update=False, create=False):
         self._db = db
         self._cols = ZwiProfile.column_names()
         self._pro = []
         self._lookup = {}
         self._cl = None
         self._pr = None
-        self._setup(drop, update)
+        self._setup(drop, update, create)
         pass
 
     def __len__(self):
@@ -1094,18 +1096,18 @@ class ZwiPro(object):
             self._cl, self._pr = zwi_init()
             pass
         return self._pr
-    
+
     @property
     def cols(self):
         return self._cols
 
-    def _setup(self, drop, update):
+    def _setup(self, drop, update, create):
         """Syncronise with the local DB version of the world."""
         if self._db is None:  # attach to the usual DB
-            self._db = DataBase.db_connect(get_zpath(fname='profile.db'), create=True)
+            self._db = DataBase.db_connect(get_zpath(fname='profile.db'), create=create)
             pass
 
-        if drop:
+        if drop and not create:
             self._db.drop_table('profile')
             pass
 

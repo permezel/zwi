@@ -4,8 +4,10 @@
 
 import sys
 import signal
+import time
 import zwi
 from zwi import ZwiPro, ZwiUser, DataBase, get_zdir
+import zwift
 
 try:
     import click
@@ -143,7 +145,7 @@ def reset():
     """Reset the database, refresh followers/followees data."""
     db = DataBase.db_connect(reset=True, create=True)
     ZwiUser(db, update=True)
-    ZwiPro().update(force=True)
+    ZwiPro(create=True).update(force=True)
 
     return 0
 
@@ -152,7 +154,7 @@ def reset():
 def update():
     """Update user's follower/follee DB cache."""
     ZwiUser(update=True)
-    ZwiPro().update(force=True)
+    ZwiPro(create=True).update(force=True)
 
     return 0
 
@@ -165,11 +167,11 @@ def pro_update(force):
     if zwi.verbo_p(1):
         skip = []
     else:
-        skip=['date', 'hours', 'distance', 'climbed', 'bike']
+        skip = ['date', 'hours', 'distance', 'climbed', 'bike']
         pass
 
     usr = ZwiUser()
-    pro = ZwiPro()
+    pro = ZwiPro(create=True)
     pr = pro.Printer(skip=skip)
     done = []
 
