@@ -411,6 +411,8 @@ def worlds(poll, sleep):
 
     (cl, _) = zwi.zwi_init(key='zwi.py')
     lines = 0
+    maps = dict()
+
     while True:
         # seems like there is only one worldID?
         for i in range(1, 2):
@@ -418,17 +420,36 @@ def worlds(poll, sleep):
             p = None
 
             try:
+                if cl is None: # handle connexion reset
+                    print(f'connexion reset -- retry...')
+                    (cl, _) = zwi.zwi_init(key='zwi.py')
+                    break
+
                 w = cl.get_world(world_id=i)
                 if w:
                     p = w.players
                     pass
             except zwift.error.RequestException as e:
                 zwi.debug(1, f'{i=} {e=}')
-                pass
+            except (requests.exceptions.ConnectionError,
+                    urllib3.exceptions.ProtocolError) as e:
+                zwi.debug(1, f'{i=} {e=}')
+                if cl is not None:
+                    del cl
+                    pass
+                cl = w = p = None
+                break
 
-            if w and p:
+            if cl and w and p:
                 friends = 0
+                maps = dict(zip(maps.keys(), [0 for k in maps.keys()]))
                 for f in p['friendsInWorld']:
+                    # print(f'{f=}')
+                    if f['mapId'] not in maps.keys():
+                        maps[f['mapId']] = 0
+                        lines = 0	# spit out header again
+                        pass
+                    maps[f['mapId']] += 1
                     if f['followerStatusOfLoggedInPlayer'] != 'NO_RELATIONSHIP':
                         friends += 1
                         pass
@@ -436,9 +457,20 @@ def worlds(poll, sleep):
 
                 zwi.debug(1, f'{i=} {p["worldId"]=} {p["playerCount"]=}')
                 if lines % 20 == 0:
-                    print('world players friends')
+                    print('world players friends', end='')
+                    for j in range(1, 1+len(maps.keys())):
+                        print(f' {j:7d}', end='')
+                        pass
+                    print('')
                     pass
-                print(f'{i:5d} {p["playerCount"]:7d} {friends:7d}')
+                print(f'{i:5d} {p["playerCount"]:7d} {friends:7d}', end='')
+                key = list(maps.keys())
+                key.sort()
+                for k in key:
+                    # print(f' {k}:{maps[k]}', end='')
+                    print(f' {maps[k]:7d}', end='')
+                    pass
+                print()
                 lines += 1
 
                 if zwi.verbosity:
