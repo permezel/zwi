@@ -11,7 +11,7 @@ from .core import *
 from .asset_cache import *
 from .qt_gui import *
 
-__version__ = '0.3a2.dev1'
+__version__ = '0.3a2.dev2'
 
 __all__ = [name for name, obj in locals().items()
            if not (name.startswith('_') or inspect.ismodule(obj))]
