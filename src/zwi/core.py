@@ -44,7 +44,8 @@ def get_zdir(subdir: str = None, mkdir: bool = True) -> str:
     return zdir
 
 
-def get_zpath(dname: str = None, fname: str = None, subdir: str = None, mkdir: bool = True) -> str:
+def get_zpath(dname: str = None, fname: str = None, subdir: str = None,
+              mkdir: bool = True) -> str:
     """Provide the default database path, or overrides to it."""
     dname = get_zdir(subdir=subdir, mkdir=mkdir) if dname is None else dname
     fname = 'zwi.db' if fname is None else fname
@@ -60,7 +61,8 @@ def auth_user(key='zwi.py'):
         name = keyring.get_password(key, 'username')
     except Exception as e:
         print('Error:', e)
-        raise SystemExit(f'{e!r}: Cannot locate `username` entry -- re-run `auth`.')
+        raise SystemExit(
+            f'{e!r}: Cannot locate `username` entry -- re-run `auth`.')
 
     return name
 
@@ -71,7 +73,8 @@ def auth_passwd(name, key='zwi.py'):
         passwd = keyring.get_password(key, name)
     except Exception as e:
         print('Error:', e)
-        raise SystemExit(f'{e!r} Cannot locate `password` entry for user {name} -- re-run `auth`.')
+        raise SystemExit(f'{e!r} Cannot locate `password` entry for user'
+                         + f' {name} -- re-run `auth`.')
 
     return passwd
 
@@ -242,7 +245,8 @@ class DataBase(object):
 
     def table_exists(self, name):
         """Query if table exists in DB."""
-        sel = f'''SELECT name FROM sqlite_master WHERE type='table' AND name='{name}';'''
+        sel = ''.join("SELECT name FROM sqlite_master",
+                      f" WHERE type='table' AND name='{name}';")
         res = self.execute(sel)
         for tup in res.fetchall():
             # print(f'{type(tup)=} {isinstance(tup, tuple)=}')
@@ -270,14 +274,17 @@ class DataBase(object):
         return self.execute(f'DROP TABLE IF EXISTS {name};')
 
     def create_table(self, name, cols):
-        exe = f"CREATE TABLE IF NOT EXISTS {name}({', '.join(cols)});"
+        _c = ', '.join(cols)
+        exe = f'CREATE TABLE IF NOT EXISTS {name}({_c});'
         self.execute(exe)
         return
 
     def row_insert(self, name, cols, vals):
         debug(2, f'{cols=}')
         debug(2, f'{vals=}')
-        exe = f'''INSERT INTO {name} ({', '.join(cols)}) VALUES({', '.join(vals)});'''
+        _c = ', '.join(cols)
+        _v = ', '.join(vals)
+        exe = f'INSERT INTO {name} ({_c}) VALUES({_v});'
         self.execute(exe)
         self.commit()
         return
@@ -285,7 +292,9 @@ class DataBase(object):
     def row_replace(self, name, cols, vals):
         debug(2, f'{cols=}')
         debug(2, f'{vals=}')
-        exe = f'''REPLACE INTO {name} ({', '.join(cols)}) VALUES({', '.join(vals)});'''
+        _c = ', '.join(cols)
+        _v = ', '.join(vals)
+        exe = f'REPLACE INTO {name} ({_c}) VALUES({_v});'
         self.execute(exe)
         self.commit()
         return
@@ -356,7 +365,7 @@ class ZwiBase(object):
 
     def __eq__(self, other):
         rv = self.difference(other, ignore=[])
-        if type(rv) is type(False):
+        if isinstance(rv, bool):
             return rv
         return (len(rv) == 0)
 
@@ -496,7 +505,7 @@ class ZwiBase(object):
 class ZwiFollowers(ZwiBase):
     def __eq__(self, other):
         rv = self.difference(other, ignore=['userAgent', 'addDate', 'delDate'])
-        if type(rv) is type(False):
+        if isinstance(rv, bool):
             return rv
         return (len(rv) == 0)
 
@@ -656,7 +665,7 @@ class ZwiFollowers(ZwiBase):
 class ZwiProfile(ZwiBase):
     def __eq__(self, other):
         rv = self.difference(other, ignore=['addDate', 'delDate'])
-        if type(rv) is type(False):
+        if isinstance(rv, bool):
             return rv
         return (len(rv) == 0)
 
@@ -847,7 +856,6 @@ class ZwiProfile(ZwiBase):
 
         return self.traverse(fun, list())
 
-
     def refresh(self, pro):
         """Refresh local cached values from Zwift."""
         return pro.refresh(self)
@@ -857,7 +865,8 @@ class ZwiProfile(ZwiBase):
 class ZwiUser(object):
     """Zwift user model."""
 
-    def __init__(self, db=None, drop=False, update=False, uid=None, pro_update=None):
+    def __init__(self, db=None, drop=False, update=False, uid=None,
+                 pro_update=None):
         self._db = db
         self._wers = []
         self._wees = []
@@ -892,11 +901,13 @@ class ZwiUser(object):
         return self._wers_dict
 
     def wees_iter(self):
-        """Construct an iterator to produce the wees as ZwiFollowers objects."""
+        """Construct an iterator to produce the wees
+        as ZwiFollowers objects."""
         return (ZwiFollowers.wees(x) for x in self._wees)
 
     def wers_iter(self):
-        """Construct an iterator to produce the wers as ZwiFollowers objects."""
+        """Construct an iterator to produce the wers
+        as ZwiFollowers objects."""
         return (ZwiFollowers.wers(x) for x in self._wers)
 
     def _setup(self, drop, update, uid):
@@ -917,8 +928,11 @@ class ZwiUser(object):
             self._db.drop_table('followees')
             pass
 
-        self._db.create_table('followers', ZwiFollowers.column_names(create=True, pk='followerId'))
-        self._db.create_table('followees', ZwiFollowers.column_names(create=True, pk='followeeId'))
+        def cn(pk=''):
+            return ZwiFollowers.column_names(create=True, pk=pk)
+
+        self._db.create_table('followers', cn(pk='followerId'))
+        self._db.create_table('followees', cn(pk='followeeId'))
 
         werid = self._cols.index('followerId')
         weeid = self._cols.index('followeeId')
@@ -930,8 +944,10 @@ class ZwiUser(object):
             wees_dict = {}
             self._slurp(wers, wers_dict, werid, 'followers')
             self._slurp(wees, wees_dict, weeid, 'followees')
-            self.update(wers, wers_dict, werid, 'followers', self.wers_fac, self.wers_cmp, self.wers_del)
-            self.update(wees, wees_dict, weeid, 'followees', self.wees_fac, self.wees_cmp, self.wees_del)
+            self.update(wers, wers_dict, werid, 'followers', self.wers_fac,
+                        self.wers_cmp, self.wers_del)
+            self.update(wees, wees_dict, weeid, 'followees', self.wees_fac,
+                        self.wees_cmp, self.wees_del)
             pass
 
         self._slurp(self._wers, self._wers_dict, werid, 'followers')
@@ -943,8 +959,7 @@ class ZwiUser(object):
                 verbo(0, f'\rupdate profile of followers: {cnt}', end='')
                 cnt += 1
                 pass
-            if cnt: verbo(0, '')
-            #  prefer? verbo((-1,0)[bool(cnt)], '')
+            verbo(0, '') if cnt else None
 
             cnt = 0
             for r in self._wees:
@@ -952,7 +967,7 @@ class ZwiUser(object):
                 verbo(0, f'\rupdate profile of followees: {cnt}', end='')
                 cnt += 1
                 pass
-            verbo((-1,0)[bool(cnt)], '')
+            verbo(0, '') if cnt else None
             pass
         pass
 
@@ -966,7 +981,7 @@ class ZwiUser(object):
             count = count + 1
             verbo(1, f'\rslurped {tab}: {count}', end='')
             pass
-        if count: verbo(1, '')
+        verbo(1, '') if count else None
         pass
 
     def update(self, cache, ns, idx, tab, factory, compare, delete):
@@ -982,7 +997,8 @@ class ZwiUser(object):
         dic = {}
         start = 0
         while True:
-            fe = self._pr.request.json(f'/api/profiles/{self._uid}/{tab}?start={start}&limit=200')
+            req = f'/api/profiles/{self._uid}/{tab}?start={start}&limit=200'
+            fe = self._pr.request.json(req)
             if len(fe) == 0:
                 break
 
@@ -993,7 +1009,7 @@ class ZwiUser(object):
                 pass
             verbo(1, f'\rupdate: processed {tab}: {start}', end='')
             pass
-        if start: verbo(1, '')
+        verbo(1, '') if start else None
 
         # I want to add these into the DB in historical order.
         # It appears that more recent followers are returned first above.
@@ -1003,7 +1019,7 @@ class ZwiUser(object):
         hdr = f'No longer in {tab}:\n'
         for r in cache:
             zid = r[idx]
-            if not zid in dic.keys():
+            if zid not in dic.keys():
                 r = factory(r)
                 print(f'{hdr}      {r.profile.firstName} {r.profile.lastName}')
                 hdr = ''
@@ -1025,7 +1041,7 @@ class ZwiUser(object):
             start += 1
             verbo(1, f'\rupdate: processed {tab}: {start}', end='')
             pass
-        if start: verbo(1, '')
+        verbo(1, '') if start else None
         return
 
     def wers_fac(self, v):
@@ -1104,14 +1120,16 @@ class ZwiPro(object):
     def _setup(self, drop, update, create):
         """Syncronise with the local DB version of the world."""
         if self._db is None:  # attach to the usual DB
-            self._db = DataBase.db_connect(get_zpath(fname='profile.db'), create=create)
+            self._db = DataBase.db_connect(get_zpath(fname='profile.db'),
+                                           create=create)
             pass
 
         if drop and not create:
             self._db.drop_table('profile')
             pass
 
-        self._db.create_table('profile', ZwiProfile.column_names(create=True, pk='id'))
+        cn = ZwiProfile.column_names(create=True, pk='id')
+        self._db.create_table('profile', cn)
         self._slurp()
         pass
 
@@ -1122,17 +1140,17 @@ class ZwiPro(object):
         for r in g():
             self._pro.append(r)
             id = r[0]
-            assert not id in self._lookup
+            assert id not in self._lookup
             self._lookup[id] = len(self._pro) - 1
 
             count = count + 1
             if count <= 10 and verbo_p(2):
                 verbo(3, f'{r=}')
-            elif verbo_p(1):
-                print(f'\rslurped profile: {count}', end='')
+            else:
+                verbo(1, f'\rslurped profile: {count}', end='')
                 pass
             pass
-        if count: verbo(1, '')
+        verbo(1 * int(count > 0), '')
         pass
 
     def lookup(self, zid, fetch=False):
@@ -1165,9 +1183,12 @@ class ZwiPro(object):
                 #  retry this some #  of times
                 count += 1
                 if count < 8:
-                    print(f'retry: {count} of Connection reset trying to obtain profile for {zid}: {e}')
+                    print(f'retry: {count} of Connection reset',
+                          f'trying to obtain profile for {zid}: {e}')
                     continue
-                raise SystemExit(f'Connection reset trying to obtain profile for {zid}: {e}')
+                raise SystemExit(
+                    f'Connection reset trying to obtain profile for {zid}: {e}'
+                )
             except Exception as e:
                 print(f'{type(e)} {e}')
                 raise SystemExit(f'Some error trying to update id {zid}.')
@@ -1197,7 +1218,8 @@ class ZwiPro(object):
             self._pro.append(rsp)
             self._lookup[zid] = len(self._pro) - 1
             pass
-        self._db.row_replace('profile', new.column_names(), new.column_values())
+        self._db.row_replace('profile', new.column_names(),
+                             new.column_values())
         return new
 
     def refresh(self, old):
@@ -1224,7 +1246,8 @@ class ZwiPro(object):
         rsp[self._cols.index('addDate')] = new.addDate
         self._pro[self._lookup[old.id]] = rsp
         # update DB
-        self._db.row_replace('profile', new.column_names(), new.column_values())
+        self._db.row_replace('profile', new.column_names(),
+                             new.column_values())
         return new
 
     def delete(self, zid):
@@ -1232,18 +1255,19 @@ class ZwiPro(object):
         self._db.row_delete('profile', 'id', zid)
         pass
 
-
     class Printer():
-        fmt = [ ('date',     ('{:18.18s} ',  '{p.addDate:18.18s} ')),
-                ('ZwiftID',  ('{:>8.8s} ',   '{p.id:8d} ')),
-                ('FTP',      ('{:>4.4s} ',   '{p.ftp:4d} ')),
-                ('level',    ('{:>5.5s} ',   '{p.achievementLevel/100.0:5.2f} ')),
-                ('hours',    ('{:>6.6s} ',   '{p.totalTimeInMinutes//60:6d} ')),
-                ('distance', ('{:>8.8s} ',   '{p.totalDistance:8d} ')),
-                ('climbed',  ('{:>8.8s} ',   '{p.totalDistanceClimbed:8d} ')),
-                ('bike',     ('{:16.16s} ',  '{p.virtualBikeModel:16.16s} ')),
-                ('name',     ('{:s}',        '{p.firstName} {p.lastName}')),
+        fmt = [
+            ('date',     ('{:18.18s} ',  '{p.addDate:18.18s} ')),
+            ('ZwiftID',  ('{:>8.8s} ',   '{p.id:8d} ')),
+            ('FTP',      ('{:>4.4s} ',   '{p.ftp:4d} ')),
+            ('level',    ('{:>5.5s} ',   '{p.achievementLevel/100.0:5.2f} ')),
+            ('hours',    ('{:>6.6s} ',   '{p.totalTimeInMinutes//60:6d} ')),
+            ('distance', ('{:>8.8s} ',   '{p.totalDistance:8d} ')),
+            ('climbed',  ('{:>8.8s} ',   '{p.totalDistanceClimbed:8d} ')),
+            ('bike',     ('{:16.16s} ',  '{p.virtualBikeModel:16.16s} ')),
+            ('name',     ('{:s}',        '{p.firstName} {p.lastName}')),
         ]
+
         def __init__(self, title=None, skip=[]):
             self.line_cnt = 0
             self.title = title
@@ -1271,12 +1295,13 @@ class ZwiPro(object):
             """Output the body."""
             print(prefix, end='')
             for idx in range(len(self.fmtc)):
-                print(eval("f'" + self.fmt[idx][1][1] +"'"), end='')
+                print(eval("f'" + self.fmt[idx][1][1] + "'"), end='')
                 pass
             print('')
 
         def out(self, p, prefix=' '):
-            if p is None: return	# accept None objects
+            if p is None:
+                return    # accept None objects
 
             if self.line_cnt == 0 and self.title:
                 # Emit title prior to first line.
