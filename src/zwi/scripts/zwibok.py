@@ -3,59 +3,48 @@
 # Copyright (c) 2021 Damon Anton Permezel, all bugs revered.
 """Bokeh-based interface to ZwiPro profile data."""
 
-import os
 import sys
-import time
 import signal
 import functools
-from threading import Thread
 import zwi
-from zwi import ZwiPro, debug, debug_p, verbo, get_zdir
+from zwi import ZwiPro, debug, debug_p
+
+server = None
 
 try:
     import click
-    import bokeh
     import pandas as pd
-    import numpy as np
+    from bokeh.events import ButtonClick
+    from bokeh.layouts import column, row
+    from bokeh.models import ColumnDataSource, Slider, TextInput, Select
+    from bokeh.models import CDSView, BooleanFilter, IndexFilter
+    from bokeh.models import Button, Toggle, HoverTool
+    from bokeh.plotting import figure
+    from bokeh.server.server import Server
 except Exception as e:
     print('import error', e)
     raise SystemExit('use `pip3 install` to install missing modules.')
 
-from bokeh.application import Application
-from bokeh.application.handlers.function import FunctionHandler
-from bokeh.embed import server_document
-from bokeh.events import ButtonClick
-from bokeh.io import curdoc
-from bokeh.layouts import column, row
-from bokeh.models import ColumnDataSource, Slider, TextInput, Dropdown, Select
-from bokeh.models import CDSView, GroupFilter, BooleanFilter, IndexFilter
-from bokeh.models import Button, Toggle, HoverTool
-from bokeh.models.glyphs import Text, Rect
-from bokeh.models.annotations import Title
-from bokeh.plotting import figure, show, output_notebook
-from bokeh.server.server import Server
-from bokeh.server.server import Server
-from bokeh.themes import Theme
-from tornado.ioloop import IOLoop
 
 def pro_to_df(pro, want):
     """Subset and convert from ZwiPro() to DataFrame()."""
     res = {c: [] for c in want}
-            
-    for r in pro._pro:	# iterate over rows
+
+    for r in pro._pro:  # iterate over rows
         if int(r[pro.cols.index('weight')]) // 1000 > 500:
-            continue	# >500kg?
+            continue    # >500kg?
         if int(r[pro.cols.index('totalDistance')]) // 1000 == 0:
-            continue	# skip those with zero total distance
+            continue    # skip those with zero total distance
         if int(r[pro.cols.index('totalTimeInMinutes')]) == 0:
-            continue	# skip those with zero total distance
-        
-        for c in want:	# iterate over the desired columns
+            continue    # skip those with zero total distance
+
+        for c in want:  # iterate over the desired columns
             res[c].append(r[pro.cols.index(c)])
             pass
         pass
 
     return pd.DataFrame(res)
+
 
 #
 # adjust some values
@@ -67,7 +56,9 @@ def minmax(x, mi, ma):
         return ma
     return x
 
+
 NONE = 'https://upload.wikimedia.org/wikipedia/commons/c/ce/Image_of_none.svg'
+
 
 def map_none(x):
     if x is None or x == 'None':
@@ -76,9 +67,11 @@ def map_none(x):
         return x
     pass
 
-COL_WIDTH    = 200
-ROW_HEIGHT   = 48
+
+COL_WIDTH = 200
+ROW_HEIGHT = 48
 CIRCLE_ALPHA = 0.7
+
 
 class ZwiBok(object):
     icol = [
@@ -129,14 +122,16 @@ class ZwiBok(object):
         self.refresh_profile()
         self.setup_sliders()
 
-        for w in [self.radius, self.x_sel, self.y_sel]: # dropdown]:
+        for w in [self.radius, self.x_sel, self.y_sel]:
             w.on_change('value', self.update_data)
             pass
 
         self.reset.on_event(ButtonClick, self.reset_callback)
 
-        self.do_male.on_click(lambda event: self.radio(self.do_male, self.do_fema))
-        self.do_fema.on_click(lambda event: self.radio(self.do_fema, self.do_male))
+        self.do_male.on_click(
+            lambda event: self.radio(self.do_male, self.do_fema))
+        self.do_fema.on_click(
+            lambda event: self.radio(self.do_fema, self.do_male))
 
         self.source = None
         self.fig = None
@@ -164,23 +159,25 @@ class ZwiBok(object):
         df = pro_to_df(self.pro, self.col)
         df['age'] = df['age'].apply(lambda x: minmax(x, 0, 120))
         df['ftp'] = df['ftp'].apply(lambda x: minmax(x, 0, 2000))
-        df['achievementLevel'] = df['achievementLevel'].apply(lambda x: int(x) // 100)
         df['weight'] = df['weight'].apply(lambda x: int(x) // 1000)
         df['height'] = df['height'].apply(lambda x: int(x) // 10)
-        df['totalDistance'] = df['totalDistance'].apply(lambda x: int(x) // 1000)
         df['imageSrc'] = df['imageSrc'].apply(lambda x: map_none(x))
+        df['achievementLevel'] = df['achievementLevel'].apply(
+            lambda x: int(x) // 100)
+        df['totalDistance'] = df['totalDistance'].apply(
+            lambda x: int(x) // 1000)
 
         self.df = df
         pass
 
     def setup_sliders(self):
         """Setup the sliders based on the limits of the current DataFrame."""
-        
+
         # slider restriction function: used below
-        def do_restrict(smin, smax, c, cb, a,b,n):
+        def do_restrict(smin, smax, c, cb, a, b, n):
             """Callback function to modify data based on slider settings."""
             debug(3, f'restrict: {c=} {smin.value=} {smax.value=} {cb=} {n=}')
-            self.doc.hold(policy='combine')	# combine all events
+            self.doc.hold(policy='combine')    # combine all events
 
             n = int(n)
             if smin.value > n:
@@ -193,7 +190,7 @@ class ZwiBok(object):
             if c == 'age':
                 self.update_sliders(self.df, self.icol, self.sliders)
                 pass
-            self.update_data(1,2,3)
+            self.update_data(1, 2, 3)
             self.doc.unhold()
             pass
 
@@ -204,11 +201,11 @@ class ZwiBok(object):
         # the `cb` is the last one returned from gen_restrict()
         # XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
         def gen_restrict(smin, smax, c):
-            cb = functools.partial(do_restrict, smin, smax, c)            
-            return lambda a, b, n: cb(cb, a,b,n) 
+            cb = functools.partial(do_restrict, smin, smax, c)
+            return lambda a, b, n: cb(cb, a, b, n)
 
         # create the value selection range sliders
-        wtf={}
+        wtf = {}
         self.sliders = {}
         for c in self.icol:
             ma = self.df[c].max()
@@ -220,7 +217,8 @@ class ZwiBok(object):
                               step=1, width=COL_WIDTH, height=ROW_HEIGHT)
 
                 self.sliders[c] = (smin, smax, row(smin, smax, width=300,
-                                                   height=ROW_HEIGHT, sizing_mode='fixed'))
+                                                   height=ROW_HEIGHT,
+                                                   sizing_mode='fixed'))
 
                 cb = gen_restrict(smin, smax, c)
                 if debug_p(3):
@@ -232,7 +230,7 @@ class ZwiBok(object):
                 smax.on_change('value_throttled', cb)
                 pass
             pass
-        
+
         # XXXXXXXXXXXXXXXXXXXXXXXXXXXXX
         # This was just to debug the problems with setting the on_change() when
         # lambda was always using the last `cb = gen_restrict()` value.
@@ -268,7 +266,7 @@ class ZwiBok(object):
         pass
 
     def really_update_sliders(self, df, icol, sliders):
-        debug(2, f'update sliders')
+        debug(2, 'update sliders')
 
         if 'age' in self.precomputed:
             mi = self.sliders['age'][0]
@@ -279,26 +277,27 @@ class ZwiBok(object):
                 fuzz = (mi.end+1 - mi.start) // 10
                 pass
             debug(2, f'{mi.value=} {mi.value+fuzz=}')
-            xy = [(x,y) for (x,y) in self.precomputed['age']
+            xy = [(x, y) for (x, y) in self.precomputed['age']
                   if mi.value-fuzz <= x and mi.value >= x]
             debug(2, f'{xy=}')
-            xy = [(x,y) for (x,y) in xy if ma.value <= y and ma.value+fuzz >= y]
+            xy = [(x, y) for (x, y) in xy
+                  if ma.value <= y and ma.value+fuzz >= y]
             if len(xy) > 0:
                 # for (x,y) in self.precomputed['age']:
                 debug(2, f'{mi.value=} {ma.value=} {xy=}')
-                (x,y) = xy[0]
-                for d in self.precomputed['age'][(x,y)]:
-                    mi = self.precomputed['age'][(x,y)][d][0]
-                    ma = self.precomputed['age'][(x,y)][d][1]
+                (x, y) = xy[0]
+                for d in self.precomputed['age'][(x, y)]:
+                    mi = self.precomputed['age'][(x, y)][d][0]
+                    ma = self.precomputed['age'][(x, y)][d][1]
                     self.adjust_slider_pair(d, mi, ma)
                     pass
                 pass
             pass
         pass
-    
+
     def slider_touched(self, key):
         if key in ['XX_NO_MORE_age', 'XX_NO_MORE_ftp']:
-	    # these are XX_NO_MORE_always checked, as they are reduced
+            # these are XX_NO_MORE_always checked, as they are reduced
             return True
         else:
             mi = self.sliders[key][0]
@@ -327,7 +326,7 @@ class ZwiBok(object):
         a.update(value=low)
         b.update(value=high)
         pass
-    
+
     def precompute_slider_updates(self):
         """sic."""
         rv = {}
@@ -344,15 +343,15 @@ class ZwiBok(object):
                 delta = int(delta / 10)
                 pass
 
-            for (x, y) in [ (x,y)
-                            for x in range(int(mi), int(ma), delta)
-                            for y in range(int(mi), int(ma), delta) if x < y ]:
+            for (x, y) in [(x, y)
+                           for x in range(int(mi), int(ma), delta)
+                           for y in range(int(mi), int(ma), delta) if x < y]:
                 # debug(2, f'{mi=} {ma=} {delta=}: {x} < {c} and {c} <= {y}')
                 eg = self.df.query(f'{x} < {c} and {c} <= {y}')
-                rv[c][(x,y)] = {}
+                rv[c][(x, y)] = {}
                 for d in self.icol:
                     if d is not c and len(eg[d]) > 0:
-                        rv[c][(x,y)][d] = (eg[d].min(), eg[d].max())
+                        rv[c][(x, y)][d] = (eg[d].min(), eg[d].max())
                         pass
                     pass
                 pass
@@ -360,14 +359,16 @@ class ZwiBok(object):
         return rv
 
     # self.precomputed = precompute_slider_updates(df, icol, sliders)
-    # for (x,y) in self.precomputed['age']:
-    #    debug(2, f'{(x,y)=} {self.precomputed["age"][(x,y)]}')
+    # for (x, y) in self.precomputed['age']:
+    #    debug(2, f'{(x, y)=} {self.precomputed["age"][(x, y)]}')
 
     def old_update_sliders(self, df, icol, sliders):
         """Update sliders based on the 'age' setting."""
-        self.df = self.df.query(f'{self.sliders["age"][0].value} <= age and age <= {self.sliders["age"][1].value}')
+        self.df = self.df.query(' and '.join(
+            f'{self.sliders["age"][0].value} <= age',
+            f'age <= {self.sliders["age"][1].value}'))
         debug(2, f'{df=}')
-    
+
         for c in self.icol:
             if c == 'age':
                 continue
@@ -377,26 +378,25 @@ class ZwiBok(object):
             self.adjust_slider_pair(c, mi, ma)
             pass
         pass
-    
+
     def reset_callback(self, event):
         self.need_reset = True
         pass
-
 
     def radio(self, a, b):
         """Make sure that at least one of the buttons is clicked."""
         if not a.active and not b.active:
             b.active = True
             pass
-        self.update_data(1,2,3)
+        self.update_data(1, 2, 3)
         pass
 
     def filter_chk(self, df, slid_key):
         """Generator for the filter check index."""
-        for idx in self.df.index:	# for each row
+        for idx in self.df.index:       # for each row
             doit = True
-            for c in self.df.columns:	# ..for each column
-                if c in slid_key:	# .... if there is a slider
+            for c in self.df.columns:   # ..for each column
+                if c in slid_key:       # .... if there is a slider
                     (mi, ma, _) = self.sliders[c]
                     v = self.df[c][idx]
                     if mi.value <= v and v <= ma.value:
@@ -420,7 +420,7 @@ class ZwiBok(object):
           <div>
             <img
                 src="@imageSrc" height="128" alt="@imageSrc" width="128"
-		style="float: left; margin: 0px 15px 15px 0px;"
+                style="float: left; margin: 0px 15px 15px 0px;"
                 border="2"
             ></img>
           </div>
@@ -472,7 +472,7 @@ class ZwiBok(object):
                     'distance': df['totalDistance'],
                     'climbed': df['totalDistanceClimbed'],
                     'level': df['achievementLevel'],
-            }
+                    }
             if reset:
                 self.source = ColumnDataSource(data=data)
             else:
@@ -481,7 +481,8 @@ class ZwiBok(object):
                 pass
 
             # only check sliders which have been touched
-            slid_key = [c for c in self.sliders.keys() if self.slider_touched(c)]
+            slid_key = [c for c in self.sliders.keys()
+                        if self.slider_touched(c)]
 
             if len(slid_key) == 0:
                 index = [i for i in df.index]
@@ -500,10 +501,12 @@ class ZwiBok(object):
                 is_fema = [False for f in df['male']]
                 pass
 
-            vmale = CDSView(source=self.source, filters=[BooleanFilter(is_male),
-                                                         IndexFilter(index)])
-            vfema = CDSView(source=self.source, filters=[BooleanFilter(is_fema),
-                                                         IndexFilter(index)])
+            vmale = CDSView(source=self.source,
+                            filters=[BooleanFilter(is_male),
+                                     IndexFilter(index)])
+            vfema = CDSView(source=self.source,
+                            filters=[BooleanFilter(is_fema),
+                                     IndexFilter(index)])
 
             if reset:
                 hov = HoverTool(tooltips=None)
@@ -512,7 +515,8 @@ class ZwiBok(object):
                 self.fig = fig = figure(title=f'{x}::{y}',
                                         x_axis_label=x,
                                         y_axis_label=y,
-                                        tools=[hov, 'crosshair', 'box_zoom', 'reset'],
+                                        tools=[hov, 'crosshair', 'box_zoom',
+                                               'reset'],
                                         sizing_mode='stretch_width',
                                         max_width=2560,
                                         plot_height=1024, plot_width=1280)
@@ -553,6 +557,18 @@ class ZwiBok(object):
         pass
 
     def update(self):
+        """Periodic timer callback."""
+        if self.doc and self.doc.session_context:
+            # request expiration here so that a close of the
+            # window from show() will result in termination.
+            # This alone is not sufficient.
+            sess = self.doc.session_context.session
+            if sess and not sess.expiration_requested:
+                # print(f'{sess=} {sess.expiration_requested=}')
+                sess.request_expiration()
+                pass
+            pass
+
         if self.need_reset:
             # reset by refreshing the ZwiPro
             self.pro = ZwiPro()
@@ -584,12 +600,24 @@ class ZwiBok(object):
 
     pass
 
+
 def zwibok(doc):
-    zwibok = ZwiBok(doc)
+    def cleanup_session(session_context):
+        # print(f'{session_context=}')
+        # server.io_loop.stop()
+        session_context.session._loop.stop()
+        pass
+
+    # This will eventually get called, resulting in this process
+    # terminating, but it is sluggish.
+    doc.on_session_destroyed(cleanup_session)
+
+    ZwiBok(doc)
     pass
 
-def keyboardInterruptHandler(signal, frame):
-    print("KeyboardInterrupt (signal: {}) has been caught. Cleaning up...".format(signal))
+
+def keyboardInterruptHandler(sig, frame):
+    print(f'KeyboardInterrupt (signal: {sig}) has been caught. Cleaning up.')
     sys.exit(0)
 
 
@@ -600,10 +628,13 @@ def cli(verbose, debug):
     zwi.setup(verbose, debug)
     pass
 
+
 @click.option('--port', default=5006, help='Run on specified port.')
 @cli.command()
 def serve(port):
     """Run ZwiBok server."""
+
+    global server
 
     server = Server({
         '/zwibok': zwibok,
@@ -616,18 +647,18 @@ def serve(port):
     server.io_loop.start()
     pass
 
+
 def main():
     try:
         cli()
     except Exception as e:
         debug(2, f'{type(e)=}\n{e!r}')
-        print(f'{e}')
-        if debug_p(0):
+        if debug_p(1):
             raise Exception('oops!') from e
-        sys.exit(1)
+        raise SystemExit(e)
     pass
 
-    
+
 """
     def ic_callback(cache):
         debug(1, f'callback: {cache=}')
@@ -637,7 +668,7 @@ def main():
 
         cache.update(process)
         pass
-    
+
     #
     # attach the asset cache for the images
     #
