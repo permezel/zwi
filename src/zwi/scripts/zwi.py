@@ -6,8 +6,10 @@ import sys
 import signal
 import time
 import zwi
-from zwi import ZwiPro, ZwiUser, DataBase, get_zdir
+from zwi import ZwiPro, ZwiUser, DataBase
 import zwift
+import requests
+import urllib3
 
 try:
     import click
@@ -68,20 +70,24 @@ def followees(usr):
     for r in usr.wees:
         d = dict(zip(usr.cols, r))
         count += 1
-        boo = (d['followeeStatusOfLoggedInPlayer'] != d['followerStatusOfLoggedInPlayer'])
+        boo = (d['followeeStatusOfLoggedInPlayer']
+               != d['followerStatusOfLoggedInPlayer'])
 
         if zwi.verbo_p(1):
             # dump out entire list
-            print('{:4d}{}{} {}\t{} {}'.format(count, [' ', '*'][boo]
-                                               , d['followeeStatusOfLoggedInPlayer']
-                                               , d['followerStatusOfLoggedInPlayer']
-                                               , d['firstName'], d['lastName']))
+            print('{:4d}{}{} {}\t{} {}'.format(
+                count,
+                [' ', '*'][boo],
+                d['followeeStatusOfLoggedInPlayer'],
+                d['followerStatusOfLoggedInPlayer'],
+                d['firstName'], d['lastName']))
         elif boo:
             # display only those whose soc status match
-            print('{:4d} {} {}\t{} {}'.format(count
-                                              , d['followeeStatusOfLoggedInPlayer']
-                                              , d['followerStatusOfLoggedInPlayer']
-                                              , d['firstName'], d['lastName']))
+            print('{:4d} {} {}\t{} {}'.format(
+                count,
+                d['followeeStatusOfLoggedInPlayer'],
+                d['followerStatusOfLoggedInPlayer'],
+                d['firstName'], d['lastName']))
             pass
         pass
     print('processed {} followees'.format(count))
@@ -93,19 +99,22 @@ def followers(usr):
     for r in usr.wers:
         d = dict(zip(usr.cols, r))
         count += 1
-        boo = (d['followeeStatusOfLoggedInPlayer'] != d['followerStatusOfLoggedInPlayer'])
+        boo = (d['followeeStatusOfLoggedInPlayer']
+               != d['followerStatusOfLoggedInPlayer'])
 
         if zwi.verbo_p(1):
-            print('{:4d}{}{} {}\t{} {}'.format(count, [' ', '*'][boo]
-                                               , d['followeeStatusOfLoggedInPlayer']
-                                               , d['followerStatusOfLoggedInPlayer']
-                                               , d['firstName'], d['lastName']))
+            print('{:4d}{}{} {}\t{} {}'.format(
+                count, [' ', '*'][boo],
+                d['followeeStatusOfLoggedInPlayer'],
+                d['followerStatusOfLoggedInPlayer'],
+                d['firstName'], d['lastName']))
         elif boo:
             # display only those whose soc status match
-            print('{:4d} {} {}\t{} {}'.format(count
-                                              , d['followeeStatusOfLoggedInPlayer']
-                                              , d['followerStatusOfLoggedInPlayer']
-                                              , d['firstName'], d['lastName']))
+            print('{:4d} {} {}\t{} {}'.format(
+                count,
+                d['followeeStatusOfLoggedInPlayer'],
+                d['followerStatusOfLoggedInPlayer'],
+                d['firstName'], d['lastName']))
             pass
         pass
     print('processed {} followers'.format(count))
@@ -187,7 +196,7 @@ def pro_update(force):
                     print(f'skipping {zid}')
                     pass
                 pass
-            elif old is None or old is not new and  old != new:
+            elif old is None or old is not new and old != new:
                 pr.out(new, prefix='*')
                 if old is not None:
                     zwi.verbo(2, f'{old.last_difference}')
@@ -233,15 +242,17 @@ def pro_list():
 
 def validate_prune(ctx, param, value):
     if isinstance(value, str):
-        if value  == '' or len(value) == 1 and value in 'YN':
+        if value == '' or len(value) == 1 and value in 'YN':
             return value
         raise click.BadParameter('must be "Y" or "N"')
     raise click.BadParameter('funny type')
 
 
 @click.option('--skip', help='skip over the first N profile entries')
-@click.option('--zid', help='update just the profile entry for the given Zwift ID')
-@click.option('--seek', help='seek into the list of entries up to the specified Zwift ID')
+@click.option('--zid',
+              help='update just the profile entry for the given Zwift ID')
+@click.option('--seek',
+              help='skip all entries before the specified Zwift ID')
 @click.option('--prune', help='auto-prune all invalid entries (Y/N)',
               type=str, callback=validate_prune, default='', prompt=False)
 @cli.command()
@@ -297,8 +308,9 @@ def pro_refresh(skip, zid, seek, prune):
             zwi.verbo(1, f'{p.last_difference}')
             pass
 
-        if zid: break
-        if seek: seek = None
+        if zid:
+            break
+        seek = None
         pass
 
     if zid and count != 1:
@@ -321,7 +333,8 @@ def gui():
 @click.option('--zid', prompt='Zwift user ID', help='Zwift ID to inspect')
 @click.option('--update', is_flag=True,
               help='update existing DB entries from Zwift')
-def inspect(zid, update):
+@click.option('--reset', is_flag=True, help='reset DB first')
+def inspect(zid, update, reset):
     """Inspect Zwift user `zid` and slurp down the followers/followees."""
 
     if zwi.verbo_p(1):
@@ -333,7 +346,7 @@ def inspect(zid, update):
     zwi.verbo(1, f'Inspecting user {zid}')
 
     pro = ZwiPro()
-    pseudo = ZwiUser(uid=int(zid), update=update, pro_update=pro)
+    pseudo = ZwiUser(uid=int(zid), update=update, pro_update=pro, drop=reset)
     vic = pro.lookup(zid)
     if vic is None:
         vic = pro.update(zid)
@@ -413,6 +426,8 @@ def worlds(poll, sleep):
     lines = 0
     maps = dict()
 
+    ecnt = 0
+
     while True:
         # seems like there is only one worldID?
         for i in range(1, 2):
@@ -420,8 +435,8 @@ def worlds(poll, sleep):
             p = None
 
             try:
-                if cl is None: # handle connexion reset
-                    print(f'connexion reset -- retry...')
+                if cl is None:  # handle connexion reset
+                    print('connexion reset -- retry...')
                     (cl, _) = zwi.zwi_init(key='zwi.py')
                     break
 
@@ -429,11 +444,18 @@ def worlds(poll, sleep):
                 if w:
                     p = w.players
                     pass
-            except zwift.error.RequestException as e:
+            except (zwift.error.RequestException,
+                    requests.exceptions.ConnectionError,
+                    requests.exceptions.ChunkedEncodingError,
+                    urllib3.exceptions.ProtocolError,
+                    urllib3.exceptions.ProtocolError,
+                    Exception, BaseException) as e:
+                # I should not be catching BaseException here, except
+                # that the zwift package bases exception on it, rather
+                # than Exception.
                 zwi.debug(1, f'{i=} {e=}')
-            except (requests.exceptions.ConnectionError,
-                    urllib3.exceptions.ProtocolError) as e:
-                zwi.debug(1, f'{i=} {e=}')
+                ecnt += 1
+                zwi.verbo(1, f'exception {e=} count: {ecnt}')
                 if cl is not None:
                     del cl
                     pass
@@ -447,10 +469,12 @@ def worlds(poll, sleep):
                     # print(f'{f=}')
                     if f['mapId'] not in maps.keys():
                         maps[f['mapId']] = 0
-                        lines = 0	# spit out header again
+                        lines = 0   # spit out header again
                         pass
                     maps[f['mapId']] += 1
-                    if f['followerStatusOfLoggedInPlayer'] != 'NO_RELATIONSHIP':
+                    buddy = (f['followerStatusOfLoggedInPlayer']
+                             != 'NO_RELATIONSHIP')
+                    if buddy:
                         friends += 1
                         pass
                     pass
@@ -475,7 +499,9 @@ def worlds(poll, sleep):
 
                 if zwi.verbosity:
                     for f in p['friendsInWorld']:
-                        if f['followerStatusOfLoggedInPlayer'] != 'NO_RELATIONSHIP':
+                        buddy = (f['followerStatusOfLoggedInPlayer']
+                                 != 'NO_RELATIONSHIP')
+                        if buddy:
                             print(f'{f["firstName"]} {f["lastName"]}')
                             pass
                         pass
@@ -492,58 +518,6 @@ def worlds(poll, sleep):
             return 0
         pass
     pass
-
-# disable this ...
-# @cli.command()
-def test():
-    """Test some things...."""
-    import flask
-    from flask import Flask, redirect, send_file
-    from markupsafe import escape
-
-    def process(self, wrk):
-        """Process completed URL fetch."""
-        print(f'process: {wrk=}')
-        url = wrk[0]
-        pass
-
-    def callback(cache):
-        """This callback is called in the worker thread."""
-        print(f'callback: {cache=}')
-        cache.update(process)
-        pass
-
-    idir = get_zdir('.image-cache')
-    cache = zwi.AssetCache(idir, callback)
-    app = Flask(__name__)
-
-    @app.route('/<req>')
-    def root(req):
-        print(f'root: {req=}')
-        return escape(req)
-
-    @app.route('/images/<img>')
-    def images(img):
-        print(f'images: {escape(img)}')
-
-        try:
-            fna = cache.load('https://static-cdn.zwift.com/prod/profile/' + img, {})
-            if fna:
-                print(f'cache.load: => {fna}')
-                return flask.send_file(fna,
-                                       as_attachment=False,
-                                       download_name=f'{img}.jpg',
-                                       mimetype='image/jpeg')
-            else:
-                return flask.redirect('https://static-cdn.zwift.com/prod/profile/' + img, code=307)
-        except Exception as ex:
-            print(f'/images/{escape(img)}: {ex=}')
-            return flask.Response(f'/images/{escape(img)}: {ex=}')
-        pass
-
-    app.run()
-
-    return 0
 
 
 def keyboardInterruptHandler(sig, frame):
